@@ -34,7 +34,7 @@ class VpnKey(Base):
     plan_id = Column(
         Integer, ForeignKey("plans.id", ondelete="SET NULL"), nullable=True
     )
-    pasarguard_key_id = Column(String(128), nullable=True, unique=True)
+    remnawave_key_id = Column(String(128), nullable=True, unique=True)
     access_url = Column(Text, nullable=False)
     name = Column(String(128), nullable=True)
     price = Column(Numeric(10, 2), nullable=True)

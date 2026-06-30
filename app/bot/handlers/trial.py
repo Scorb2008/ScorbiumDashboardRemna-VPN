@@ -58,7 +58,7 @@ async def handle_trial(callback: CallbackQuery) -> None:
 
         from datetime import datetime, timezone, timedelta
         from app.models.vpn_key import VpnKey, VpnKeyStatus
-        from app.services.pasarguard.pasarguard import PasarguardService
+        from app.services.remnawave.remnawave_api import get_vpn_panel
         from app.core.config import config
 
         trial_days = int(settings.get("trial_days", "3"))
@@ -80,37 +80,25 @@ async def handle_trial(callback: CallbackQuery) -> None:
         session.add(key)
         await session.flush()
 
-        # Создаём в Marzban
+        # Создаём в Remnawave
         username = f"trial_{callback.from_user.id}_{key.id}"
         try:
-            group_ids: list[int] = []
-            raw_groups = settings.get("vpn_group_ids", "")
-            if raw_groups:
-                group_ids = parse_int_list_setting(raw_groups)
-
-            marzban = PasarguardService()
-            marz_user = await marzban.create_user(
+            panel = get_vpn_panel()
+            panel_user = await panel.create_user(
                 username=username,
                 expire_days=trial_days,
                 data_limit_gb=0,
-                group_ids=group_ids or None,
             )
-            sub_token = marz_user.get("subscription_url", "")
-            _pg = config.pasarguard
-            panel_base = str(_pg.pasarguard_admin_panel).rstrip("/") if _pg else ""
-            if sub_token:
-                access_url = (
-                    sub_token
-                    if sub_token.startswith("http")
-                    else f"{panel_base}{sub_token.rstrip('/')}"
-                )
+            sub_url = panel_user.get("subscriptionUrl", "")
+            if sub_url:
+                key.access_url = sub_url.rstrip("/")
             else:
-                access_url = f"{panel_base}/sub/{username}"
+                base = str(config.remnawave.remnawave_admin_panel).rstrip("/")
+                key.access_url = f"{base}/sub/{username}/"
 
-            key.pasarguard_key_id = username
-            key.access_url = access_url
+            key.remnawave_key_id = username
         except Exception as e:
-            log.error(f"Trial Marzban error for user {callback.from_user.id}: {e}")
+            log.error(f"Trial Remnawave error for user {callback.from_user.id}: {e}")
             await session.delete(key)
             await session.flush()
             await callback.answer(t("key_error", lang), show_alert=True)

@@ -96,7 +96,7 @@ async def sample_vpn_key(session, sample_user, sample_plan):
     key = VpnKey(
         user_id=sample_user.id,
         plan_id=sample_plan.id,
-        pasarguard_key_id="vpn_123456789_1",
+        remnawave_key_id="vpn_123456789_1",
         access_url="https://example.com/sub/test",
         name="Test Key",
         price=Decimal("10.00"),

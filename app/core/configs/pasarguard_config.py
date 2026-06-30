@@ -3,8 +3,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Any, Dict, Optional, Tuple
 from functools import lru_cache
 
-from app.utils.path import env_file
 from app.core.exceptions import EnvException, PasarguardAuthError
+from app.utils.path import env_file
 from app.utils.log import log
 
 
@@ -56,8 +56,7 @@ class _PasarGuardConfig(BaseSettings):
     def validate_admin_panel_url(cls, value: HttpUrl) -> HttpUrl:
         """Validate URL Admin panel"""
 
-        # Reject bind-address values; Pasarguard panel URL must be dialable.
-        if value.host == "0.0.0.0":  # nosec B104
+        if value.host == "0.0.0.0":
             raise EnvException("⚠ PASARGUARD_ADMIN_PANEL cannot point to 0.0.0.0")
 
         if value.host in ["localhost", "127.0.0.1"]:

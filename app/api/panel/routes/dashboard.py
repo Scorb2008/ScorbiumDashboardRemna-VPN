@@ -91,13 +91,13 @@ async def dashboard(request: Request, db: AsyncSession = Depends(get_db)):
     ctx["recent_users"] = await UserService(db).get_all(limit=8)
     ctx["recent_payments"] = await PaymentService(db).get_all(limit=8)
 
-    from app.services.pasarguard.pasarguard import get_vpn_panel
+    from app.services.remnawave.remnawave_api import get_vpn_panel
 
     try:
         panel_stats = await get_vpn_panel().get_system_stats()
-        ctx["marzban_stats"] = panel_stats
+        ctx["remnawave_stats"] = panel_stats
     except Exception:
-        ctx["marzban_stats"] = None
+        ctx["remnawave_stats"] = None
 
     try:
         from app.services.system_metrics import SystemMetrics

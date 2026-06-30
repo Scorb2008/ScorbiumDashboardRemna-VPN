@@ -12,7 +12,7 @@ _AUTO_RENEW_LOW_BALANCE_NOTIFIED: dict[int, object] = {}
 
 
 async def expire_outdated_keys() -> None:
-    """Mark expired VPN keys and disable them in Marzban."""
+    """Mark expired VPN keys and disable them in Remnawave."""
     try:
         async with AsyncSessionFactory() as session:
             count = await VpnKeyService(session).expire_outdated()
@@ -31,15 +31,15 @@ async def expire_outdated_keys() -> None:
         log.exception("[vpn_tasks] expire_outdated_keys error")
 
 
-async def sync_keys_from_marzban() -> None:
+async def sync_keys_from_remnawave() -> None:
     """Sync VPN key statuses from the configured VPN panel."""
     try:
         async with AsyncSessionFactory() as session:
-            result = await VpnKeyService(session).sync_from_marzban()
+            result = await VpnKeyService(session).sync_from_remnawave()
             await session.commit()
             log.info(f"[vpn_tasks] VPN panel sync: {result}")
     except Exception:
-        log.exception("[vpn_tasks] sync_keys_from_marzban error")
+        log.exception("[vpn_tasks] sync_keys_from_remnawave error")
 
 
 async def expire_loop() -> None:
@@ -56,11 +56,11 @@ async def expire_loop() -> None:
 
 
 async def sync_loop() -> None:
-    log.info("🔄 Marzban sync task started")
+    log.info("🔄 Remnawave sync task started")
     await asyncio.sleep(60)
     while True:
         try:
-            await sync_keys_from_marzban()
+            await sync_keys_from_remnawave()
             await asyncio.sleep(SYNC_INTERVAL)
         except Exception:
             log.exception("sync_loop error")

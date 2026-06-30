@@ -259,7 +259,7 @@ async def check_pending_yookassa_payments() -> None:
                             f"Пользователь: {pd['user_id']}\n"
                             f"Платеж: #{pd['id']}\n"
                             f"План: {escape_html(plan_name)}\n\n"
-                            f"Платеж подтвержден, но ключ не создан. Проверьте Pasarguard.",
+                            f"Платеж подтвержден, но ключ не создан. Проверьте VPN панель.",
                         )
 
                 reply_markup = None

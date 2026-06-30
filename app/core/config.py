@@ -10,6 +10,7 @@ class _Config:
     web_config: Optional[Any] = None
     telegram_config: Optional[Any] = None
     pasarguard_config: Optional[Any] = None
+    remnawave_config: Optional[Any] = None
     database_config: Optional[Any] = None
     yookassa_config: Optional[Any] = None
     utils_config: Optional[Any] = None
@@ -42,6 +43,14 @@ class _Config:
 
             self.pasarguard_config = pasarguard
         return self.pasarguard_config
+
+    @property
+    def remnawave(self) -> Any:
+        if self.remnawave_config is None:
+            from .configs.remnawave_config import get_remnawave_config
+
+            self.remnawave_config = get_remnawave_config()
+        return self.remnawave_config
 
     @property
     def database(self) -> Any:
@@ -88,6 +97,7 @@ class _Config:
 
         self.database_config = None
         self.pasarguard_config = None
+        self.remnawave_config = None
         self.telegram_config = None
         self.yookassa_config = None
         self.utils_config = None
@@ -146,7 +156,8 @@ class _Config:
     def __repr__(self):
         return (
             f"<Config: (telegram: {self.telegram}, pasarguard: {self.pasarguard}, "
-            f"database: {self.database}, yookassa: {self.yookassa}, web: {self.web})>"
+            f"remnawave: {self.remnawave_config}, database: {self.database}, "
+            f"yookassa: {self.yookassa}, web: {self.web})>"
         )
 
 

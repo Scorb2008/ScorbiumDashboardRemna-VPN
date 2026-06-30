@@ -343,7 +343,7 @@ async def test_subscriptions_page_includes_expired_and_revoked_keys(
     expired_key = VpnKey(
         user_id=sample_user.id,
         plan_id=sample_plan.id,
-        pasarguard_key_id="vpn_123456789_2",
+        remnawave_key_id="vpn_123456789_2",
         access_url="https://example.com/sub/expired",
         name="Expired Key",
         price=Decimal("10.00"),
@@ -353,7 +353,7 @@ async def test_subscriptions_page_includes_expired_and_revoked_keys(
     revoked_key = VpnKey(
         user_id=sample_user.id,
         plan_id=sample_plan.id,
-        pasarguard_key_id="vpn_123456789_3",
+        remnawave_key_id="vpn_123456789_3",
         access_url="https://example.com/sub/revoked",
         name="Revoked Key",
         price=Decimal("10.00"),

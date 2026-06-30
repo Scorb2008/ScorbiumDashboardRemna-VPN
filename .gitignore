@@ -76,3 +76,5 @@ htmlcov/
 nginx/ssl/
 nginx/nginx.generated.conf
 
+# Any files 
+api-1.json

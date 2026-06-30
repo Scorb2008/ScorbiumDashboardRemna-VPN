@@ -15,7 +15,7 @@ All route logic has been moved to app/api/panel/routes/:
   - broadcasts.py    (broadcast messages)
   - telegram.py      (bot settings, payment system config)
   - backup.py        (DB backup/restore)
-  - pasarguard.py    (Marzban/Pasarguard panel)
+  - remnawave.py     (Remnawave panel)
   - nodes.py         (VPN nodes management)
   - exports.py       (CSV/XLSX export)
   - admins.py        (admin user management)

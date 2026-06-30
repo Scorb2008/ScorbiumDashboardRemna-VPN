@@ -94,3 +94,20 @@ class ConfigValueError(ConfigException):
 
 class ConfigNotFoundError(ConfigException):
     pass
+
+
+# ====== RemnawaveException ======
+class RemnawaveException(AppException):
+    pass
+
+
+class RemnawaveAuthError(RemnawaveException):
+    pass
+
+
+class RemnawaveRequestError(RemnawaveException):
+    pass
+
+
+class RemnawaveValueError(RemnawaveException):
+    pass

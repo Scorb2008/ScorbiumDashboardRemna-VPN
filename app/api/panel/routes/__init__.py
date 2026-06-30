@@ -2,7 +2,7 @@ from fastapi import APIRouter
 
 from . import auth, dashboard, users, plans, payments
 from . import subscriptions, promos, referrals, support, vpn
-from . import broadcasts, telegram, backup, pasarguard, nodes
+from . import broadcasts, telegram, backup, remnawave, nodes
 from . import exports, admins, keyboard, audit, monitoring, notifications, logo, health
 
 router = APIRouter()
@@ -18,7 +18,7 @@ router.include_router(vpn.router, prefix="/vpn")
 router.include_router(broadcasts.router, prefix="/broadcasts")
 router.include_router(telegram.router, prefix="/telegram")
 router.include_router(backup.router, prefix="/backup")
-router.include_router(pasarguard.router, prefix="/pasarguard")
+router.include_router(remnawave.router, prefix="/remnawave")
 router.include_router(nodes.router, prefix="/nodes")
 router.include_router(exports.router, prefix="/exports")
 router.include_router(admins.router, prefix="/admins")

@@ -403,7 +403,7 @@ async def _base_ctx(
         "bot_username": None,
         "app_name": config.web.app_name,
         "app_version": config.web.app_version,
-        "vpn_panel_type": "marzban",
+        "vpn_panel_type": "remnawave",
         "admin_role": role,
         "admin_username": admin_info["sub"] if admin_info else "",
         "has_perm": has_permission,

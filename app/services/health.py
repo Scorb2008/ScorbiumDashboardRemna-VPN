@@ -217,12 +217,12 @@ class HealthService:
             await bot.session.close()
 
     async def _check_vpn_panel(self, entry: HealthEntry):
-        """Check Pasarguard/Marzban VPN panel via actual API client."""
+        """Check Remnawave VPN panel via API client."""
         try:
-            from app.services.pasarguard.pasarguard import PasarguardService
+            from app.services.remnawave.remnawave_api import get_vpn_panel
 
             start = time.time()
-            panel = PasarguardService()
+            panel = get_vpn_panel()
             ok = await panel.validate_connection()
             latency = (time.time() - start) * 1000
             if ok:

@@ -25,7 +25,7 @@ from app.services.promo import PromoService
 from app.services.referral import ReferralService
 from app.services.broadcast import BroadcastService
 from app.services.plan import PlanService
-from app.services.pasarguard.pasarguard import get_vpn_panel
+from app.services.remnawave.remnawave_api import get_vpn_panel
 from app.services.bot_settings import BotSettingsService, parse_int_list_setting
 from app.models.payment import PaymentStatus, PaymentType
 from app.bot.utils.media import resolve_photo_input
@@ -509,12 +509,13 @@ async def _show_admin_key_hwids(
         await _show_user_keys(callback, user_id)
         return
 
-    username = (key.pasarguard_key_id or "").strip()
+    username = (key.remnawave_key_id or "").strip()
     hwids_data = {"hwids": [], "count": 0}
     if username:
         try:
             panel = get_vpn_panel()
-            if hasattr(panel, "get_hwids_by_username"):
+        except Exception:
+            pass
                 hwids_data = await panel.get_hwids_by_username(username)
         except Exception as e:
             log.warning(f"Failed to load HWIDs for key {key_id}: {e}")
@@ -564,17 +565,17 @@ async def _show_admin_key_hwids(
 
 
 async def _show_groups(callback: CallbackQuery, saved_ids: list[int]) -> None:
-    from app.services.pasarguard.pasarguard import PasarguardService
+    from app.services.remnawave.remnawave_api import RemnawaveService
 
     try:
-        groups = await PasarguardService().get_groups()
+        groups = await RemnawaveService().get_groups()
     except Exception:
         groups = []
 
     if not groups:
         try:
             await callback.message.edit_text(
-                "🌐 <b>Группы VPN</b>\n\n❌ Не удалось загрузить группы из Marzban.",
+                "🌐 <b>Группы VPN</b>\n\n❌ Не удалось загрузить группы из Remnawave.",
                 reply_markup=_back_admin_kb(),
                 parse_mode="HTML",
             )
@@ -583,7 +584,7 @@ async def _show_groups(callback: CallbackQuery, saved_ids: list[int]) -> None:
         return
 
     lines = [
-        "🌐 <b>Группы VPN (Marzban)</b>\n",
+        "🌐 <b>Группы VPN (Remnawave)</b>\n",
         "Нажми на группу чтобы включить/выключить:\n",
     ]
     builder = InlineKeyboardBuilder()
@@ -631,10 +632,10 @@ def _node_status_badge(status: str) -> tuple[str, str]:
 
 
 async def _show_nodes(callback: CallbackQuery) -> None:
-    from app.services.pasarguard.pasarguard import PasarguardService
+    from app.services.remnawave.remnawave_api import RemnawaveService
 
     try:
-        result = await PasarguardService().get_nodes()
+        result = await RemnawaveService().get_nodes()
         if isinstance(result, list):
             nodes = result
         elif isinstance(result, dict):
@@ -1548,7 +1549,7 @@ async def admin_delete_key_hwid(callback: CallbackQuery) -> None:
         await callback.answer("❌ Ключ не найден", show_alert=True)
         return
 
-    username = (key.pasarguard_key_id or "").strip()
+    username = (key.remnawave_key_id or "").strip()
     if not username:
         await callback.answer("❌ У ключа нет username панели", show_alert=True)
         return
@@ -1597,7 +1598,7 @@ async def admin_reset_key_hwids(callback: CallbackQuery) -> None:
         await callback.answer("❌ Ключ не найден", show_alert=True)
         return
 
-    username = (key.pasarguard_key_id or "").strip()
+    username = (key.remnawave_key_id or "").strip()
     if not username:
         await callback.answer("❌ У ключа нет username панели", show_alert=True)
         return
@@ -1736,7 +1737,7 @@ async def admin_sync_keys(callback: CallbackQuery) -> None:
         return
     await callback.answer("🔄 Синхронизация...")
     async with AsyncSessionFactory() as session:
-        result = await VpnKeyService(session).sync_from_marzban()
+        result = await VpnKeyService(session).sync_from_remnawave()
         await session.commit()
     await callback.message.edit_text(
         f"✅ Синхронизация завершена\n\nОбработано: {result['synced']}\nОшибок: {result['errors']}",
@@ -1777,7 +1778,7 @@ async def admin_gift_key_confirm(callback: CallbackQuery) -> None:
         )
         await callback.answer(f"✅ Ключ #{key.id} выдан", show_alert=True)
     else:
-        await callback.answer("❌ Ошибка создания ключа в Marzban", show_alert=True)
+        await callback.answer("❌ Ошибка создания ключа в Remnawave", show_alert=True)
 
     await _show_user_detail(callback, user_id)
 
@@ -1900,7 +1901,7 @@ class AdminExtendDaysState(StatesGroup):
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# НОВЫЕ АДМИН ФИЧИ (v1.5)
+# NEW (v1.5)
 # ═════════════════════════════════════════════════════════════════════════════
 
 
@@ -3766,7 +3767,7 @@ async def givekey_cmd(message: Message) -> None:
         )
         await message.answer(f"✅ Ключ #{key.id} выдан пользователю {user_id}")
     else:
-        await message.answer("❌ Ошибка создания ключа в Marzban")
+        await message.answer("❌ Ошибка создания ключа в Remnawave")
 
 
 @router.message(F.photo)

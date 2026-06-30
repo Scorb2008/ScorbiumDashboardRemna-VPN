@@ -606,17 +606,17 @@ async def ps_save_stars_rate(request: Request, db: AsyncSession = Depends(get_db
     return JSONResponse({"ok": True, "message": "Курс Stars сохранён"})
 
 
-@router.post("/test-marzban", response_class=HTMLResponse)
-async def test_marzban(request: Request, db: AsyncSession = Depends(get_db)):
+@router.post("/test-remnawave", response_class=HTMLResponse)
+async def test_remnawave(request: Request, db: AsyncSession = Depends(get_db)):
     _require_permission(request, "system")
     try:
-        from app.services.pasarguard.pasarguard import get_vpn_panel
+        from app.services.remnawave.remnawave_api import get_vpn_panel
 
         ok = await get_vpn_panel().validate_connection()
         if ok:
-            _toast(Response(), "✅ Подключение к Marzban/Pasarguard успешно")
+            _toast(Response(), "✅ Подключение к Remnawave успешно")
         else:
-            _toast(Response(), "❌ Не удалось подключиться к Marzban", "error")
+            _toast(Response(), "❌ Не удалось подключиться к Remnawave", "error")
     except Exception as e:
         _toast(Response(), f"❌ Ошибка: {str(e)[:100]}", "error")
     return HTMLResponse("")
@@ -631,7 +631,7 @@ async def telegram_groups_page(request: Request, db: AsyncSession = Depends(get_
         ctx["bot_settings"].get("vpn_group_ids")
     )
     try:
-        from app.services.pasarguard.pasarguard import get_vpn_panel
+        from app.services.remnawave.remnawave_api import get_vpn_panel
 
         groups = await get_vpn_panel().get_groups()
         ctx["groups"] = groups

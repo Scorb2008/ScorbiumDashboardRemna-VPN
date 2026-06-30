@@ -955,7 +955,7 @@ async def cabinet_servers(request: Request, db: AsyncSession = Depends(get_db)):
     if not user:
         return RedirectResponse(url=_cabinet_redirect_url(request), status_code=302)
     try:
-        from app.services.pasarguard.pasarguard import get_vpn_panel
+        from app.services.remnawave.remnawave_api import get_vpn_panel
 
         hosts = await get_vpn_panel().get_hosts()
     except Exception:
