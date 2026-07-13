@@ -177,7 +177,7 @@ async def notify_expiring_soon() -> None:
             log.info("[vpn_tasks] Sent %d expiry notifications", total_sent)
 
     except Exception as e:
-        log.error(f"[vpn_tasks] notify_expiring_soon error: {e}")
+        log.error("[vpn_tasks] notify_expiring_soon error: {}", e, exc_info=True)
 
 
 async def auto_renew_keys() -> None:
@@ -336,7 +336,7 @@ async def auto_renew_keys() -> None:
                         )
 
             except Exception as e:
-                log.error(f"[auto_renew] key={key_id} user={user_id} error: {e}")
+                log.error("[auto_renew] key={} user={} error: {}", key_id, user_id, e, exc_info=True)
 
     except Exception as e:
-        log.error(f"[auto_renew] error: {e}")
+        log.error("[auto_renew] error: {}", e, exc_info=True)

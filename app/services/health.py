@@ -315,7 +315,7 @@ class HealthService:
         start = time.time()
         async with httpx.AsyncClient(timeout=5) as client:
             try:
-                resp = await client.get("https://api.freekassa.com", timeout=5)
+                resp = await client.get("https://api.fk.life/v1", timeout=5)
                 latency = (time.time() - start) * 1000
                 if resp.status_code < 500:
                     entry.ok(latency, "API доступен")

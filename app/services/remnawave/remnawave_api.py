@@ -329,7 +329,10 @@ class RemnawaveService(VpnPanelInterface):
         return {"nodes": []}
 
     async def get_node_by_id(self, node_id: int) -> dict:
-        return {}
+        raise RemnawaveRequestError(
+            "Node management is not supported in Remnawave. "
+            "Use the Remnawave admin panel directly."
+        )
 
     async def add_node(
         self,
@@ -344,13 +347,22 @@ class RemnawaveService(VpnPanelInterface):
         api_port: int = 62051,
         usage_coefficient: float = 1.0,
     ) -> dict:
-        return {}
+        raise RemnawaveRequestError(
+            "Adding nodes is not supported via Remnawave API. "
+            "Add nodes through the Remnawave admin panel."
+        )
 
     async def remove_node(self, node_id: int) -> None:
-        pass
+        raise RemnawaveRequestError(
+            "Removing nodes is not supported via Remnawave API. "
+            "Remove nodes through the Remnawave admin panel."
+        )
 
     async def reconnect_node(self, node_id: int) -> dict:
-        return {}
+        raise RemnawaveRequestError(
+            "Reconnecting nodes is not supported via Remnawave API. "
+            "Use the Remnawave admin panel to manage nodes."
+        )
 
     async def get_groups(self) -> list[dict]:
         return []

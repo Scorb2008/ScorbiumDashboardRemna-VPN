@@ -23,6 +23,10 @@ env/
 .env.*
 .python-version
 
+# Auto-generated security keys (created when ENCRYPTION_KEY / JWT_SECRET_KEY not set)
+.encryption_key
+.jwt_secret_key
+
 # IDE
 .vscode/
 .idea/

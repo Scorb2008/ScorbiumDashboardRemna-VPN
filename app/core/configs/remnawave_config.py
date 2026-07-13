@@ -193,21 +193,25 @@ class _RemnawaveConfig(BaseSettings):
 
 @lru_cache()
 def get_remnawave_config() -> Optional["_RemnawaveConfig"]:
-    """Returns Remnawave config."""
-    return _RemnawaveConfig()
+    """Returns Remnawave config, or None if not configured."""
+    try:
+        return _RemnawaveConfig()
+    except Exception:
+        return None
+
 
 try:
     remnawave = get_remnawave_config()
     if remnawave:
         log.success("✅ Remnawave config initialized successfully")
         log.debug(f"Remnawave: {remnawave}")
-except (EnvException, RemnawaveAuthError) as e:
-    log.error(f"""
-            ❌ Failed to initialize Remnawave config: {e}
-            Check .env file. The following must be specified:
-            REMNAWAVE_URL_PANEL=https://your-panel.com
-            And either:
-            - REMNAWAVE_ADMIN_LOGIN + REMNAWAVE_ADMIN_PASSWORD
-            - REMNAWAVE_ADMIN_TOKEN
-              """)
-    raise
+    else:
+        log.warning(
+            "⚠️ Remnawave is not configured. VPN panel features will be unavailable."
+        )
+except Exception as e:
+    log.warning(
+        "⚠️ Failed to initialize Remnawave config: {}. "
+        "VPN panel features will be unavailable.",
+        e,
+    )

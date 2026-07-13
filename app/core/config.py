@@ -131,6 +131,13 @@ class _Config:
             log.error(f"Error validating Pasarguard settings: {e}")
 
         try:
+            _ = self.remnawave
+            results["remnawave"] = True
+        except Exception as e:
+            results["remnawave"] = False
+            log.error(f"Error validating Remnawave settings: {e}")
+
+        try:
             _ = self.yookassa
             results["yookassa"] = True
         except Exception as e:

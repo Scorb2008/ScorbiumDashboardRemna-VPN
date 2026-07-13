@@ -185,8 +185,11 @@ class _PasarGuardConfig(BaseSettings):
 
 @lru_cache()
 def get_pasarguard_config() -> Optional["_PasarGuardConfig"]:
-    """Returns Marzban/Pasarguard config."""
-    return _PasarGuardConfig()
+    """Returns Marzban/Pasarguard config, or None if not configured."""
+    try:
+        return _PasarGuardConfig()
+    except Exception:
+        return None
 
 
 try:
@@ -194,13 +197,13 @@ try:
     if pasarguard:
         log.success("✅ Pasarguard config initialized successfully")
         log.debug(f"Pasarguard: {pasarguard}")
-except EnvException as e:
-    log.error(f"""
-            ❌ Failed to initialize Pasarguard config: {e}
-            Check .env file. The following must be specified:
-            PASARGUARD_ADMIN_PANEL=https://your-panel.com
-            And either:
-            - PASARGUARD_ADMIN_LOGIN + PASARGUARD_ADMIN_PASSWORD
-            - PASARGUARD_API_KEY
-              """)
-    raise
+    else:
+        log.warning(
+            "⚠️ Pasarguard is not configured. Legacy VPN panel features will be unavailable."
+        )
+except Exception as e:
+    log.warning(
+        "⚠️ Failed to initialize Pasarguard config: {}. "
+        "Legacy VPN panel features will be unavailable.",
+        e,
+    )

@@ -362,7 +362,12 @@ class VpnKeyService:
             try:
                 await self._get_panel().disable_user(key.remnawave_key_id)
             except Exception as e:
-                log.warning(f"Remnawave disable failed: {e}")
+                log.error(
+                    f"CRITICAL: Remnawave disable failed for key {key.id} "
+                    f"(user {key.user_id}, panel username {key.remnawave_key_id}): {e}",
+                    exc_info=True,
+                )
+                raise
         key.status = VpnKeyStatus.REVOKED.value
         await self.session.flush()
         return key
@@ -400,21 +405,37 @@ class VpnKeyService:
             try:
                 await self._get_panel().delete_user(key.remnawave_key_id)
             except Exception as e:
-                log.warning(f"Remnawave delete failed: {e}")
+                log.error(
+                    f"Failed to delete key {key.id} from panel "
+                    f"({key.remnawave_key_id}): {e}",
+                    exc_info=True,
+                )
         key.status = VpnKeyStatus.REVOKED.value
         await self.session.flush()
         return key
 
     async def revoke_all_for_user(self, user_id: int) -> int:
         keys = await self.get_active_for_user(user_id)
+        failed_keys: list[int] = []
         for key in keys:
             if key.remnawave_key_id:
                 try:
                     await self._get_panel().disable_user(key.remnawave_key_id)
-                except Exception:
-                    pass
+                except Exception as e:
+                    log.error(
+                        f"Failed to disable key {key.id} (user {user_id}, "
+                        f"panel {key.remnawave_key_id}): {e}",
+                        exc_info=True,
+                    )
+                    failed_keys.append(key.id)
+                    continue
             key.status = VpnKeyStatus.REVOKED.value
         await self.session.flush()
+        if failed_keys:
+            log.warning(
+                f"Revoke-all for user {user_id}: {len(failed_keys)} keys "
+                f"failed panel disable: {failed_keys}"
+            )
         return len(keys)
 
     async def sync_from_remnawave(self) -> dict:
@@ -456,12 +477,23 @@ class VpnKeyService:
             )
         )
         keys = list(result.scalars().all())
+        failed_disables: list[int] = []
         for key in keys:
             key.status = VpnKeyStatus.EXPIRED.value
             if key.remnawave_key_id:
                 try:
                     await self._get_panel().disable_user(key.remnawave_key_id)
-                except Exception:
-                    pass
+                except Exception as e:
+                    log.error(
+                        f"Failed to disable expired key {key.id} "
+                        f"(panel {key.remnawave_key_id}): {e}",
+                        exc_info=True,
+                    )
+                    failed_disables.append(key.id)
         await self.session.flush()
+        if failed_disables:
+            log.warning(
+                f"expire_outdated: {len(failed_disables)} keys failed panel disable: "
+                f"{failed_disables}"
+            )
         return len(keys)
