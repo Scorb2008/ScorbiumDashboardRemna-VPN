@@ -102,9 +102,9 @@ async def delete_key(
 async def sync_vpn(request: Request, db: AsyncSession = Depends(get_db)):
     _require_permission(request, "vpn.write")
     try:
-        from app.tasks.vpn_tasks import sync_keys_from_marzban
+        from app.tasks.vpn_tasks import sync_keys_from_remnawave
 
-        await sync_keys_from_marzban()
+        await sync_keys_from_remnawave()
         resp = Response(status_code=200)
         _toast(resp, "Синхронизация завершена")
     except Exception as e:

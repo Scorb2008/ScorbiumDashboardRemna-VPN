@@ -289,7 +289,7 @@ fi
 
 echo ""
 echo -e "${BOLD}── VPN Panel (Marzban / Pasarguard) ─────────────────${RESET}"
-VPN_PANEL_TYPE=marzban
+VPN_PANEL_TYPE=remnawave
 echo ""
 read -rp "URL панели (например: https://panel.example.com:8012): " PASAR_URL
 [[ -z "$PASAR_URL" ]] && error "URL панели обязателен"

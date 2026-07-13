@@ -11,7 +11,7 @@ class VpnKeyRead(BaseModel):
     id: int
     user_id: int
     plan_id: Optional[int] = None
-    pasarguard_key_id: Optional[str] = None
+    remnawave_key_id: Optional[str] = None
     access_url: str
     name: Optional[str] = None
     price: Optional[Decimal] = None

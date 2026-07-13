@@ -335,7 +335,7 @@ async def reset_bot_settings_cache() -> None:
 
 
 async def create_traffic_analysis_service() -> Any:
-    from app.services.pasarguard.pasarguard import get_vpn_panel
+    from app.services.remnawave.remnawave_api import get_vpn_panel
 
     class TrafficAnalysisService:
         def __init__(self):

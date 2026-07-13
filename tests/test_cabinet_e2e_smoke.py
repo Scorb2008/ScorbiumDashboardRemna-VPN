@@ -58,7 +58,7 @@ async def test_cabinet_widget_login_purchase_issue_and_view_keys_smoke(
         key = VpnKey(
             user_id=user_id,
             plan_id=plan.id,
-            pasarguard_key_id=f"vpn_{user_id}_smoke",
+            remnawave_key_id=f"vpn_{user_id}_smoke",
             access_url="https://vpn.example/sub/smoke-e2e",
             name="Smoke E2E Key",
             price=plan.price,

@@ -101,7 +101,7 @@ async def test_delete_subscription_hwid_rerenders_modal(
 
     class FakePanel:
         async def get_hwids_by_username(self, username):
-            assert username == sample_vpn_key.pasarguard_key_id
+            assert username == sample_vpn_key.remnawave_key_id
             return {
                 "hwids": [
                     {
@@ -134,7 +134,7 @@ async def test_delete_subscription_hwid_rerenders_modal(
 
     body = response.body.decode("utf-8")
     assert response.status_code == 200
-    assert deleted == [(sample_vpn_key.pasarguard_key_id, "device-a")]
+    assert deleted == [(sample_vpn_key.remnawave_key_id, "device-a")]
     assert "Для этой подписки пока не зарегистрированы устройства." in body
 
 
@@ -146,7 +146,7 @@ async def test_reset_subscription_hwids_rerenders_modal(
 
     class FakePanel:
         async def get_hwids_by_username(self, username):
-            assert username == sample_vpn_key.pasarguard_key_id
+            assert username == sample_vpn_key.remnawave_key_id
             return {
                 "hwids": [
                     {
@@ -176,5 +176,5 @@ async def test_reset_subscription_hwids_rerenders_modal(
 
     body = response.body.decode("utf-8")
     assert response.status_code == 200
-    assert reset_calls == [sample_vpn_key.pasarguard_key_id]
+    assert reset_calls == [sample_vpn_key.remnawave_key_id]
     assert "Для этой подписки пока не зарегистрированы устройства." in body

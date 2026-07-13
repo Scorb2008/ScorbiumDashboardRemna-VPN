@@ -5,6 +5,7 @@ Uses a master key from the ENCRYPTION_KEY env var.
 
 import os
 import base64
+from pathlib import Path
 
 from cryptography.fernet import Fernet
 
@@ -13,6 +14,7 @@ from app.utils.log import log
 _MASTER_KEY: str | None = None
 _FERNET: Fernet | None = None
 _FALLBACK_FERNETS: list[Fernet] | None = None
+_PERSISTED_KEY_PATH = Path(__file__).resolve().parent.parent.parent / ".encryption_key"
 
 
 def _ciphertext_summary(value: str) -> str:
@@ -77,11 +79,36 @@ def _get_fernet() -> Fernet:
 
     key_env = os.environ.get("ENCRYPTION_KEY", "").strip()
     if not key_env:
-        _FERNET = Fernet(Fernet.generate_key())
-        log.warning(
-            "⚠️ ENCRYPTION_KEY not set — using auto-generated key. "
-            "Set ENCRYPTION_KEY in .env for persistent encryption!"
-        )
+        # Try to load previously auto-generated key from disk
+        if _PERSISTED_KEY_PATH.exists():
+            try:
+                persisted = _PERSISTED_KEY_PATH.read_text().strip()
+                if persisted:
+                    _FERNET = _build_fernet_from_env(persisted)
+                    _MASTER_KEY = persisted
+                    log.info("Encryption engine initialized from persisted key")
+                    return _FERNET
+            except Exception as exc:
+                log.warning("Failed to load persisted encryption key: {}", exc)
+
+        # Generate a new key and persist it to disk for restarts
+        new_key = Fernet.generate_key().decode()
+        _FERNET = Fernet(new_key.encode())
+        _MASTER_KEY = new_key
+        try:
+            _PERSISTED_KEY_PATH.write_text(new_key)
+            _PERSISTED_KEY_PATH.chmod(0o600)
+            log.warning(
+                "⚠️ ENCRYPTION_KEY not set — generated and persisted to {}",
+                _PERSISTED_KEY_PATH,
+            )
+        except Exception as exc:
+            log.error(
+                "Failed to persist encryption key to {}: {}. "
+                "Set ENCRYPTION_KEY in .env for persistent encryption!",
+                _PERSISTED_KEY_PATH,
+                exc,
+            )
         return _FERNET
 
     try:

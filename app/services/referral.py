@@ -176,7 +176,7 @@ class ReferralService:
             await user_svc.add_balance(ref.referrer_id, bonus_value)
         elif bonus_type == ReferralBonusType.DAYS.value:
             from app.models.vpn_key import VpnKey, VpnKeyStatus
-            from app.services.pasarguard.pasarguard import get_vpn_panel
+            from app.services.remnawave.remnawave_api import get_vpn_panel
 
             key_result = await self.session.execute(
                 select(VpnKey).where(
@@ -189,10 +189,10 @@ class ReferralService:
                 from datetime import timedelta
 
                 key.expires_at = key.expires_at + timedelta(days=int(bonus_value))
-                if key.pasarguard_key_id:
+                if key.remnawave_key_id:
                     try:
                         await get_vpn_panel().extend_user(
-                            key.pasarguard_key_id, int(bonus_value)
+                            key.remnawave_key_id, int(bonus_value)
                         )
                     except Exception as e:
                         log.warning(f"Failed to extend VPN for referral bonus: {e}")

@@ -10,26 +10,25 @@ from app.core.config import config
 from app.core.database import AsyncSessionFactory
 from app.models.plan import Plan
 from app.models.vpn_key import VpnKey, VpnKeyStatus
-from app.services.pasarguard.pasarguard import get_vpn_panel
+from app.services.remnawave.remnawave_api import get_vpn_panel
 from app.services.vpn_panel_interface import VpnPanelInterface
 from app.utils.log import log
 
 
-def _marzban_username(user_id: int, key_id: int) -> str:
+def _remnawave_username(user_id: int, key_id: int) -> str:
     return f"vpn_{user_id}_{key_id}"
 
 
 class VpnKeyService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
-        self._marzban: Optional[VpnPanelInterface] = None
+        self._panel: Optional[VpnPanelInterface] = None
         self._traffic_columns_supported: Optional[bool] = None
 
     def _get_panel(self) -> VpnPanelInterface:
-        """Lazy init VPN panel — не падает при старте если панель не сконфигурирована."""
-        if self._marzban is None:
-            self._marzban = get_vpn_panel()
-        return self._marzban
+        if self._panel is None:
+            self._panel = get_vpn_panel()
+        return self._panel
 
     async def _supports_traffic_columns(self) -> bool:
         if self._traffic_columns_supported is not None:
@@ -115,39 +114,40 @@ class VpnKeyService:
 
         for key in keys:
             setattr(key, "panel_status_raw", None)
-            if not key.pasarguard_key_id:
+            if not key.remnawave_key_id:
                 continue
             try:
-                marz_user = await self._get_panel().get_user(key.pasarguard_key_id)
-                raw_status = (marz_user or {}).get("_normalized_status") or (
-                    marz_user or {}
+                panel_user = await self._get_panel().get_user(key.remnawave_key_id)
+                raw_status = (panel_user or {}).get("_normalized_status") or (
+                    panel_user or {}
                 ).get("status", "")
                 setattr(
                     key,
                     "panel_status_raw",
                     str(raw_status).lower() if raw_status else None,
                 )
-                await self._sync_db_expire_from_panel(key, marz_user)
-                self._sync_key_status_from_panel(key, marz_user)
-                if not marz_user or not traffic_columns_supported:
+                await self._sync_db_expire_from_panel(key, panel_user)
+                self._sync_key_status_from_panel(key, panel_user)
+                if not panel_user or not traffic_columns_supported:
                     continue
-                download = marz_user.get("download", 0) or 0
-                upload = marz_user.get("upload", 0) or 0
+                user_traffic = panel_user.get("userTraffic") or {}
+                download = user_traffic.get("usedTrafficBytes", 0) or 0
+                upload = 0
                 key.download = download if isinstance(download, int) else int(download)
                 key.upload = upload if isinstance(upload, int) else int(upload)
             except Exception as e:
                 log.warning(f"Traffic refresh error key {key.id}: {e}")
 
-    def _sync_key_status_from_panel(self, key: VpnKey, marz_user: dict | None) -> None:
-        if not marz_user:
+    def _sync_key_status_from_panel(self, key: VpnKey, panel_user: dict | None) -> None:
+        if not panel_user:
             key.status = VpnKeyStatus.REVOKED.value
             return
 
         raw_status = (
-            marz_user.get("_normalized_status") or marz_user.get("status", "")
+            panel_user.get("_normalized_status") or panel_user.get("status", "")
         ).lower()
 
-        if raw_status == "active":
+        if raw_status in ("active",):
             key.status = VpnKeyStatus.ACTIVE.value
             return
 
@@ -201,16 +201,17 @@ class VpnKeyService:
             return now
 
     async def _sync_db_expire_from_panel(
-        self, key: VpnKey, marz_user: dict | None
+        self, key: VpnKey, panel_user: dict | None
     ) -> bool:
-        if not key.pasarguard_key_id or not marz_user:
+        if not key.remnawave_key_id or not panel_user:
             return False
 
-        if "expire" not in marz_user:
+        expire_raw = panel_user.get("expireAt") or panel_user.get("expire")
+        if expire_raw is None:
             return False
 
         panel_expire = self._parse_expire_datetime(
-            marz_user.get("expire"),
+            expire_raw,
             datetime.now(timezone.utc),
         )
         db_expire = self._normalize_expire_datetime(key.expires_at)
@@ -240,7 +241,6 @@ class VpnKeyService:
         return result.scalar_one()
 
     async def provision(self, user_id: int, plan: Plan) -> Optional[VpnKey]:
-        """Provision VPN key with retry logic and rollback on failure."""
         from app.services.bot_settings import BotSettingsService
 
         async with AsyncSessionFactory() as check_session:
@@ -261,75 +261,59 @@ class VpnKeyService:
         self.session.add(key)
         await self.session.flush()
 
-        username = _marzban_username(user_id, key.id)
+        username = _remnawave_username(user_id, key.id)
 
-        marz_user = await self._create_in_marzban(
+        panel_user = await self._create_in_remnawave(
             username, expire_days=plan.duration_days
         )
-        if marz_user is None:
+        if panel_user is None:
             await self.session.delete(key)
             await self.session.flush()
             return None
 
-        self._set_access_url(key, marz_user, username)
+        self._set_access_url(key, panel_user)
         await self.session.flush()
-        log.info(f"VPN provisioned: user={user_id} key={key.id} marzban={username}")
+        log.info(f"VPN provisioned: user={user_id} key={key.id} remnawave={username}")
         return key
 
-    async def _create_in_marzban(
+    async def _create_in_remnawave(
         self, username: str, expire_days: int, data_limit_gb: int = 0
     ) -> dict | None:
-        """Create user in Marzban with retry logic and group_ids. Returns marz_user dict or None."""
-        from app.services.bot_settings import BotSettingsService, parse_int_list_setting
-
-        group_ids: list[int] = []
-        try:
-            raw_groups = await BotSettingsService(self.session).get("vpn_group_ids")
-            if raw_groups:
-                group_ids = parse_int_list_setting(raw_groups)
-        except Exception as e:
-            log.warning(f"Failed to load vpn_group_ids setting: {e}")
-
         last_error = None
         for attempt in range(3):
             try:
-                marz_user = await self._get_panel().create_user(
+                panel_user = await self._get_panel().create_user(
                     username=username,
                     expire_days=expire_days,
                     data_limit_gb=data_limit_gb,
-                    group_ids=group_ids or None,
                 )
-                log.info(f"Marzban provisioned {username} (attempt {attempt + 1})")
-                return marz_user
+                log.info(f"Remnawave provisioned {username} (attempt {attempt + 1})")
+                return panel_user
             except Exception as e:
                 last_error = e
                 log.warning(
-                    f"Marzban attempt {attempt + 1}/3 failed for {username}: {e}"
+                    f"Remnawave attempt {attempt + 1}/3 failed for {username}: {e}"
                 )
                 if attempt < 2:
                     await asyncio.sleep(0.5 * (attempt + 1))
-        log.error(f"All 3 Marzban attempts failed for {username}: {last_error}")
+        log.error(f"All 3 Remnawave attempts failed for {username}: {last_error}")
         return None
 
-    def _set_access_url(self, key: VpnKey, marz_user: dict, username: str) -> None:
-        """Set access_url on a VpnKey from marzban response."""
-        sub_token = marz_user.get("subscription_url", "")
-        _pg = config.pasarguard
-        panel_base = str(_pg.pasarguard_admin_panel).rstrip("/") if _pg else ""
-        if sub_token:
-            if sub_token.startswith("http"):
-                access_url = sub_token.rstrip("/")
-            else:
-                access_url = f"{panel_base}{sub_token.rstrip('/')}"
+    def _set_access_url(self, key: VpnKey, panel_user: dict) -> None:
+        sub_url = panel_user.get("subscriptionUrl", "")
+        username = panel_user.get("username", "")
+
+        if sub_url:
+            key.access_url = sub_url.rstrip("/")
         else:
-            access_url = f"{panel_base}/sub/{username}"
-        key.pasarguard_key_id = username
-        key.access_url = access_url
+            base = str(config.remnawave.remnawave_admin_panel).rstrip("/")
+            key.access_url = f"{base}/sub/{username}/"
+
+        key.remnawave_key_id = username
 
     async def provision_days(
         self, user_id: int, days: int, name: str = None
     ) -> Optional[VpnKey]:
-        """Create a VPN key with arbitrary days (no plan required)."""
         from app.services.bot_settings import BotSettingsService
 
         async with AsyncSessionFactory() as check_session:
@@ -351,14 +335,14 @@ class VpnKeyService:
         self.session.add(key)
         await self.session.flush()
 
-        username = _marzban_username(user_id, key.id)
-        marz_user = await self._create_in_marzban(username, expire_days=days)
-        if marz_user is None:
+        username = _remnawave_username(user_id, key.id)
+        panel_user = await self._create_in_remnawave(username, expire_days=days)
+        if panel_user is None:
             await self.session.delete(key)
             await self.session.flush()
             return None
 
-        self._set_access_url(key, marz_user, username)
+        self._set_access_url(key, panel_user)
         await self.session.flush()
         log.info(f"VPN provisioned (days): user={user_id} key={key.id} days={days}")
         return key
@@ -374,11 +358,16 @@ class VpnKeyService:
         key = await self.get_by_id_for_update(key_id)
         if not key:
             return None
-        if key.pasarguard_key_id:
+        if key.remnawave_key_id:
             try:
-                await self._get_panel().disable_user(key.pasarguard_key_id)
+                await self._get_panel().disable_user(key.remnawave_key_id)
             except Exception as e:
-                log.warning(f"Marzban disable failed: {e}")
+                log.error(
+                    f"CRITICAL: Remnawave disable failed for key {key.id} "
+                    f"(user {key.user_id}, panel username {key.remnawave_key_id}): {e}",
+                    exc_info=True,
+                )
+                raise
         key.status = VpnKeyStatus.REVOKED.value
         await self.session.flush()
         return key
@@ -387,11 +376,11 @@ class VpnKeyService:
         key = await self.get_by_id_for_update(key_id)
         if not key:
             return None
-        if key.pasarguard_key_id:
+        if key.remnawave_key_id:
             try:
-                await self._get_panel().extend_user(key.pasarguard_key_id, days)
+                await self._get_panel().extend_user(key.remnawave_key_id, days)
             except Exception as e:
-                log.warning(f"Marzban extend failed: {e}")
+                log.warning(f"Remnawave extend failed: {e}")
                 return None
 
         now = datetime.now(timezone.utc)
@@ -408,49 +397,66 @@ class VpnKeyService:
         await self.session.flush()
         return key
 
-    async def delete_from_marzban(self, key_id: int) -> Optional[VpnKey]:
+    async def delete_from_remnawave(self, key_id: int) -> Optional[VpnKey]:
         key = await self.get_by_id_for_update(key_id)
         if not key:
             return None
-        if key.pasarguard_key_id:
+        if key.remnawave_key_id:
             try:
-                await self._get_panel().delete_user(key.pasarguard_key_id)
+                await self._get_panel().delete_user(key.remnawave_key_id)
             except Exception as e:
-                log.warning(f"Marzban delete failed: {e}")
+                log.error(
+                    f"Failed to delete key {key.id} from panel "
+                    f"({key.remnawave_key_id}): {e}",
+                    exc_info=True,
+                )
         key.status = VpnKeyStatus.REVOKED.value
         await self.session.flush()
         return key
 
     async def revoke_all_for_user(self, user_id: int) -> int:
         keys = await self.get_active_for_user(user_id)
+        failed_keys: list[int] = []
         for key in keys:
-            if key.pasarguard_key_id:
+            if key.remnawave_key_id:
                 try:
-                    await self._get_panel().disable_user(key.pasarguard_key_id)
-                except Exception:
-                    pass
+                    await self._get_panel().disable_user(key.remnawave_key_id)
+                except Exception as e:
+                    log.error(
+                        f"Failed to disable key {key.id} (user {user_id}, "
+                        f"panel {key.remnawave_key_id}): {e}",
+                        exc_info=True,
+                    )
+                    failed_keys.append(key.id)
+                    continue
             key.status = VpnKeyStatus.REVOKED.value
         await self.session.flush()
+        if failed_keys:
+            log.warning(
+                f"Revoke-all for user {user_id}: {len(failed_keys)} keys "
+                f"failed panel disable: {failed_keys}"
+            )
         return len(keys)
 
-    async def sync_from_marzban(self) -> dict:
+    async def sync_from_remnawave(self) -> dict:
         synced, errors, fixed_expire = 0, 0, 0
         traffic_columns_supported = await self._supports_traffic_columns()
         result = await self.session.execute(
-            select(VpnKey).where(VpnKey.pasarguard_key_id.isnot(None))
+            select(VpnKey).where(VpnKey.remnawave_key_id.isnot(None))
         )
         for key in result.scalars().all():
             try:
-                marz_user = await self._get_panel().get_user(key.pasarguard_key_id)
-                if not marz_user:
+                panel_user = await self._get_panel().get_user(key.remnawave_key_id)
+                if not panel_user:
                     key.status = VpnKeyStatus.REVOKED.value
                 else:
-                    if await self._sync_db_expire_from_panel(key, marz_user):
+                    if await self._sync_db_expire_from_panel(key, panel_user):
                         fixed_expire += 1
-                    self._sync_key_status_from_panel(key, marz_user)
+                    self._sync_key_status_from_panel(key, panel_user)
                     if traffic_columns_supported:
-                        download = marz_user.get("download", 0) or 0
-                        upload = marz_user.get("upload", 0) or 0
+                        user_traffic = panel_user.get("userTraffic") or {}
+                        download = user_traffic.get("usedTrafficBytes", 0) or 0
+                        upload = 0
                         key.download = (
                             download if isinstance(download, int) else int(download)
                         )
@@ -471,12 +477,23 @@ class VpnKeyService:
             )
         )
         keys = list(result.scalars().all())
+        failed_disables: list[int] = []
         for key in keys:
             key.status = VpnKeyStatus.EXPIRED.value
-            if key.pasarguard_key_id:
+            if key.remnawave_key_id:
                 try:
-                    await self._get_panel().disable_user(key.pasarguard_key_id)
-                except Exception:
-                    pass
+                    await self._get_panel().disable_user(key.remnawave_key_id)
+                except Exception as e:
+                    log.error(
+                        f"Failed to disable expired key {key.id} "
+                        f"(panel {key.remnawave_key_id}): {e}",
+                        exc_info=True,
+                    )
+                    failed_disables.append(key.id)
         await self.session.flush()
+        if failed_disables:
+            log.warning(
+                f"expire_outdated: {len(failed_disables)} keys failed panel disable: "
+                f"{failed_disables}"
+            )
         return len(keys)

@@ -450,6 +450,19 @@ class PasarguardService(VpnPanelInterface):
 
 
 
+    async def get_hosts(self) -> list[dict]:
+        data = await self.get_nodes()
+        hosts = []
+        for node in data.get("nodes", []):
+            hosts.append({
+                "name": node.get("name", ""),
+                "address": node.get("address", ""),
+                "location": "",
+                "status": "online" if node.get("status") == "connected" else "offline",
+            })
+        return hosts
+
+
 def get_vpn_panel() -> VpnPanelInterface:
     """Factory — returns Marzban/Pasarguard panel backend."""
     return PasarguardService()

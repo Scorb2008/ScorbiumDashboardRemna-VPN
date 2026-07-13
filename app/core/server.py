@@ -18,6 +18,19 @@ from app.utils.log import log
 _bot = None
 _dp = None
 _bg_tasks = []
+_templates_cache: "Jinja2Templates | None" = None
+
+
+def _get_templates():
+    """Return a cached Jinja2Templates instance."""
+    global _templates_cache
+    if _templates_cache is None:
+        from fastapi.templating import Jinja2Templates
+
+        _templates_cache = Jinja2Templates(
+            directory=str(Path(__file__).resolve().parent.parent / "templates")
+        )
+    return _templates_cache
 _OPENAPI_TAGS = [
     {"name": "Health", "description": "Checking API availability and service status."},
     {"name": "Auth", "description": "Authentication and issuance of access tokens."},
@@ -363,7 +376,12 @@ def create_app() -> FastAPI:
         openapi_tags=_OPENAPI_TAGS,
     )
 
-    origins = [str(o) for o in config.web.allowed_origins] or ["*"]
+    origins = [str(o) for o in config.web.allowed_origins]
+    if not origins:
+        log.warning(
+            "No ALLOWED_ORIGINS configured — CORS will reject all cross-origin requests. "
+            "Set ALLOWED_ORIGINS in .env."
+        )
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins,
@@ -467,11 +485,7 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(403)
     async def _forbidden_exc(request: Request, exc: Exception):
-        from fastapi.templating import Jinja2Templates
-
-        tpl = Jinja2Templates(
-            directory=str(Path(__file__).resolve().parent.parent / "templates")
-        )
+        tpl = _get_templates()
         return tpl.TemplateResponse(
             request,
             "forbidden.html",
@@ -658,12 +672,7 @@ def create_app() -> FastAPI:
     @app.get("/metrics-dashboard", include_in_schema=False)
     async def metrics_dashboard_page(request: Request):
         """Serve the HTML dashboard page."""
-        from fastapi.templating import Jinja2Templates
-        from pathlib import Path
-
-        templates = Jinja2Templates(
-            directory=str(Path(__file__).resolve().parent.parent / "templates")
-        )
+        templates = _get_templates()
         return templates.TemplateResponse(
             request, "metrics/dashboard.html", {"request": request}
         )

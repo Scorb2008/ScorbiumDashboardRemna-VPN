@@ -102,7 +102,7 @@ async def test_cabinet_promo_days_extends_subscription(
     if after.tzinfo is None:
         after = after.replace(tzinfo=timezone.utc)
     assert after == before + timedelta(days=7)
-    panel.extend_user.assert_awaited_once_with(sample_vpn_key.pasarguard_key_id, 7)
+    panel.extend_user.assert_awaited_once_with(sample_vpn_key.remnawave_key_id, 7)
 
 
 @pytest.mark.asyncio
@@ -120,7 +120,7 @@ async def test_cabinet_balance_purchase_confirms_subscription_once(
         key = VpnKey(
             user_id=user_id,
             plan_id=plan.id,
-            pasarguard_key_id="vpn_balance_once",
+            remnawave_key_id="vpn_balance_once",
             access_url="https://vpn.example/sub/balance-once",
             name="Balance Key",
             price=plan.price,

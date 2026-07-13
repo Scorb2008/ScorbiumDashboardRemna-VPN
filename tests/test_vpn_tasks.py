@@ -38,7 +38,7 @@ async def test_auto_renew_keys_skips_revoked_keys(session, monkeypatch):
     key = VpnKey(
         user_id=user.id,
         plan_id=plan.id,
-        pasarguard_key_id="vpn_424242_1",
+        remnawave_key_id="vpn_424242_1",
         access_url="https://example.com/sub/revoked",
         name="Revoked Key",
         price=plan.price,

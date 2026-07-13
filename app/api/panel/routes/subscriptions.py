@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import get_db
 from app.services.plan import PlanService
-from app.services.pasarguard.pasarguard import get_vpn_panel
+from app.services.remnawave.remnawave_api import get_vpn_panel
 from app.services.vpn_key import VpnKeyService
 from app.services.telegram_notify import TelegramNotifyService
 from app.utils.html_utils import escape_html, html_code
@@ -31,7 +31,7 @@ async def _get_subscription_with_hwids(
         return None, {"hwids": [], "count": 0}
 
     hwids_data = {"hwids": [], "count": 0}
-    username = (key.pasarguard_key_id or "").strip()
+    username = (key.remnawave_key_id or "").strip()
     if username:
         try:
             panel = get_vpn_panel()
@@ -113,7 +113,7 @@ async def delete_subscription_hwid(
         _toast(resp, "Подписка не найдена", "error")
         return resp
 
-    username = (key.pasarguard_key_id or "").strip()
+    username = (key.remnawave_key_id or "").strip()
     hwid = hwid.strip()
 
     if username and hwid:
@@ -148,7 +148,7 @@ async def reset_subscription_hwids(
         _toast(resp, "Подписка не найдена", "error")
         return resp
 
-    username = (key.pasarguard_key_id or "").strip()
+    username = (key.remnawave_key_id or "").strip()
     if username:
         try:
             panel = get_vpn_panel()

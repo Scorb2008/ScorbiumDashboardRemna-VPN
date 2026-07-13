@@ -15,7 +15,7 @@ async def test_extend_expired_key_uses_current_time_as_base(
     await session.commit()
 
     panel = SimpleNamespace(
-        extend_user=AsyncMock(return_value={"username": sample_vpn_key.pasarguard_key_id})
+        extend_user=AsyncMock(return_value={"username": sample_vpn_key.remnawave_key_id})
     )
     monkeypatch.setattr(VpnKeyService, "_get_panel", lambda self: panel)
 
@@ -29,4 +29,4 @@ async def test_extend_expired_key_uses_current_time_as_base(
         expires_at = expires_at.replace(tzinfo=timezone.utc)
 
     assert before + timedelta(days=7) <= expires_at <= after + timedelta(days=7)
-    panel.extend_user.assert_awaited_once_with(sample_vpn_key.pasarguard_key_id, 7)
+    panel.extend_user.assert_awaited_once_with(sample_vpn_key.remnawave_key_id, 7)

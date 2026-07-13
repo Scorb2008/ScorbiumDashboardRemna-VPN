@@ -65,7 +65,7 @@ async def test_admin_delete_key_hwid_uses_indexed_hwid_lookup(monkeypatch):
             self.session = session
 
         async def get_by_id(self, key_id):
-            return SimpleNamespace(id=key_id, user_id=123, pasarguard_key_id="vpn_123_1")
+            return SimpleNamespace(id=key_id, user_id=123, remnawave_key_id="vpn_123_1")
 
     class FakeSessionContext:
         async def __aenter__(self):
@@ -114,7 +114,7 @@ async def test_admin_reset_key_hwids_resets_and_refreshes(monkeypatch):
             self.session = session
 
         async def get_by_id(self, key_id):
-            return SimpleNamespace(id=key_id, user_id=123, pasarguard_key_id="vpn_123_1")
+            return SimpleNamespace(id=key_id, user_id=123, remnawave_key_id="vpn_123_1")
 
     class FakeSessionContext:
         async def __aenter__(self):

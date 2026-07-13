@@ -2,7 +2,7 @@
 Уникальные фичи VPN бота:
 - /status    — статус всех подписок + трафик + дней осталось
 - /payments  — история платежей пользователя
-- /ping      — пинг до VPN серверов (через Marzban nodes)
+- /ping      — пинг до VPN серверов (через Remnawave nodes)
 - /top       — топ рефереров (мотивация приглашать)
 - /gift      — подарить подписку другу по username
 - Автопродление подписки с баланса
@@ -40,16 +40,15 @@ def _fmt_traffic(bytes_val: int) -> str:
     return f"{bytes_val} B"
 
 
-async def _get_traffic_for_key(pasarguard_key_id: str) -> dict | None:
+async def _get_traffic_for_key(remnawave_key_id: str) -> dict | None:
     try:
-        from app.services.pasarguard.pasarguard import PasarguardService
+        from app.services.remnawave.remnawave_api import get_vpn_panel
 
-        panel = PasarguardService()
-        user_data = await panel.get_user(pasarguard_key_id)
+        panel = get_vpn_panel()
+        user_data = await panel.get_user(remnawave_key_id)
         if user_data:
-            download = user_data.get("download", 0) or 0
-            upload = user_data.get("upload", 0) or 0
-            total = download + upload
+            user_traffic = user_data.get("userTraffic") or {}
+            total = user_traffic.get("usedTrafficBytes", 0) or 0
             return {"used": _fmt_traffic(total), "total_bytes": total}
     except Exception:
         pass
@@ -107,8 +106,8 @@ async def cmd_status(message: Message) -> None:
         else:
             lines.append(f"   🟢 {t('status_lifetime', lang)}")
 
-        if k.pasarguard_key_id:
-            traffic = await _get_traffic_for_key(k.pasarguard_key_id)
+        if k.remnawave_key_id:
+            traffic = await _get_traffic_for_key(k.remnawave_key_id)
             if traffic:
                 lines.append(
                     f"   {t('status_traffic_used', lang)}: <b>{traffic['used']}</b>"
@@ -222,21 +221,16 @@ async def cb_payments(callback: CallbackQuery) -> None:
 async def cmd_ping(message: Message) -> None:
     msg = await message.answer("🔄 Проверяю серверы...")
 
-    from app.services.pasarguard.pasarguard import get_vpn_panel
+    from app.services.remnawave.remnawave_api import get_vpn_panel
 
     try:
         panel = get_vpn_panel()
-        from app.services.pasarguard.pasarguard import PasarguardService
-
-        if isinstance(panel, PasarguardService):
-            nodes_data = await PasarguardService().get_nodes()
-            nodes = (
-                nodes_data.get("nodes", [])
-                if isinstance(nodes_data, dict)
-                else (nodes_data or [])
-            )
-        else:
-            nodes = []
+        nodes_data = await panel.get_nodes()
+        nodes = (
+            nodes_data.get("nodes", [])
+            if isinstance(nodes_data, dict)
+            else (nodes_data or [])
+        )
     except Exception:
         nodes = []
 
@@ -245,8 +239,8 @@ async def cmd_ping(message: Message) -> None:
             import httpx
             from app.core.config import config
 
-            _pg = config.pasarguard
-            base = str(_pg.pasarguard_admin_panel).rstrip("/") if _pg else ""
+            _rn = config.remnawave
+            base = str(_rn.remnawave_admin_panel).rstrip("/") if _rn else ""
             start = asyncio.get_event_loop().time()
             async with httpx.AsyncClient(timeout=5, verify=True) as client:
                 await client.get(f"{base}/api/system")
@@ -543,10 +537,10 @@ async def cb_servers(callback: CallbackQuery) -> None:
         lang = get_lang(settings, user_lang)
 
         try:
-            from app.services.pasarguard.pasarguard import PasarguardService
+            from app.services.remnawave.remnawave_api import get_vpn_panel
 
-            svc = PasarguardService()
-            result = await svc.get_nodes()
+            panel = get_vpn_panel()
+            result = await panel.get_nodes()
 
             if isinstance(result, list):
                 nodes = result

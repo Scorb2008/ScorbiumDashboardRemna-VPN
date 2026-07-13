@@ -31,15 +31,15 @@ async def delete_key(
     key_id: int, db: AsyncSession = Depends(get_db), _=Depends(get_current_admin)
 ):
 
-    key = await VpnKeyService(db).delete_from_marzban(key_id)
+    key = await VpnKeyService(db).delete_from_remnawave(key_id)
     if not key:
         raise HTTPException(status_code=404, detail="Key not found")
     await db.commit()
-    return {"detail": f"Key {key_id} deleted from Marzban"}
+    return {"detail": f"Key {key_id} deleted from Remnawave"}
 
 
 @router.post("/sync")
 async def sync_keys(db: AsyncSession = Depends(get_db), _=Depends(get_current_admin)):
-    result = await VpnKeyService(db).sync_from_marzban()
+    result = await VpnKeyService(db).sync_from_remnawave()
     await db.commit()
     return result

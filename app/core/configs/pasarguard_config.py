@@ -3,8 +3,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Any, Dict, Optional, Tuple
 from functools import lru_cache
 
-from app.utils.path import env_file
 from app.core.exceptions import EnvException, PasarguardAuthError
+from app.utils.path import env_file
 from app.utils.log import log
 
 
@@ -56,8 +56,7 @@ class _PasarGuardConfig(BaseSettings):
     def validate_admin_panel_url(cls, value: HttpUrl) -> HttpUrl:
         """Validate URL Admin panel"""
 
-        # Reject bind-address values; Pasarguard panel URL must be dialable.
-        if value.host == "0.0.0.0":  # nosec B104
+        if value.host == "0.0.0.0":
             raise EnvException("⚠ PASARGUARD_ADMIN_PANEL cannot point to 0.0.0.0")
 
         if value.host in ["localhost", "127.0.0.1"]:
@@ -196,8 +195,11 @@ class _PasarGuardConfig(BaseSettings):
 
 @lru_cache()
 def get_pasarguard_config() -> Optional["_PasarGuardConfig"]:
-    """Returns Marzban/Pasarguard config."""
-    return _PasarGuardConfig()
+    """Returns Marzban/Pasarguard config, or None if not configured."""
+    try:
+        return _PasarGuardConfig()
+    except Exception:
+        return None
 
 
 try:
@@ -205,13 +207,13 @@ try:
     if pasarguard:
         log.success("✅ Pasarguard config initialized successfully")
         log.debug(f"Pasarguard: {pasarguard}")
-except EnvException as e:
-    log.error(f"""
-            ❌ Failed to initialize Pasarguard config: {e}
-            Check .env file. The following must be specified:
-            PASARGUARD_ADMIN_PANEL=https://your-panel.com
-            And either:
-            - PASARGUARD_ADMIN_LOGIN + PASARGUARD_ADMIN_PASSWORD
-            - PASARGUARD_API_KEY
-              """)
-    raise
+    else:
+        log.warning(
+            "⚠️ Pasarguard is not configured. Legacy VPN panel features will be unavailable."
+        )
+except Exception as e:
+    log.warning(
+        "⚠️ Failed to initialize Pasarguard config: {}. "
+        "Legacy VPN panel features will be unavailable.",
+        e,
+    )

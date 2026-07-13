@@ -1,6 +1,6 @@
 {% extends "base.html" %}
-{% block title %}PasarGuard — {{ app_name }}{% endblock %}
-{% block page_title %}<i class="bi bi-hdd-network-fill me-2" style="color:var(--accent)"></i>PasarGuard / Marzban{% endblock %}
+{% block title %}Remnawave — {{ app_name }}{% endblock %}
+{% block page_title %}<i class="bi bi-hdd-network-fill me-2" style="color:var(--accent)"></i>Remnawave{% endblock %}
 
 {% block head %}
 <style>
@@ -106,10 +106,10 @@
 <div class="pg-header fade-in-up">
   <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
     <div>
-      <div class="pg-title">PasarGuard / Marzban</div>
+      <div class="pg-title">Remnawave</div>
       <div class="pg-subtitle"><i class="bi bi-hdd-network me-1"></i>Управление VPN-панелью</div>
     </div>
-    {% if marzban_stats %}
+    {% if remnawave_stats %}
     <div class="d-flex align-items-center gap-2">
       <span class="status-dot online"></span>
       <span style="font-size:.85rem;color:var(--success);font-weight:600">Подключено</span>
@@ -124,14 +124,14 @@
 </div>
 
 <!-- Stats Row (if connected) -->
-{% if marzban_stats %}
+{% if remnawave_stats %}
 <div class="row g-3 mb-4 fade-in-up">
   <div class="col-6 col-md-3">
     <div class="stat-card">
       <div class="stat-icon" style="background:rgba(34,197,94,.12);color:var(--success)">
         <i class="bi bi-wifi"></i>
       </div>
-      <div class="stat-value">{{ marzban_stats.get('online_users', marzban_stats.get('users_active', 0)) }}</div>
+      <div class="stat-value">{{ remnawave_stats.get('online_users', 0) }}</div>
       <div class="stat-label">Онлайн</div>
     </div>
   </div>
@@ -140,7 +140,7 @@
       <div class="stat-icon" style="background:rgba(0,212,170,.12);color:var(--accent)">
         <i class="bi bi-people-fill"></i>
       </div>
-      <div class="stat-value">{{ marzban_stats.get('total_user', 0) }}</div>
+      <div class="stat-value">{{ remnawave_stats.get('total_users', 0) }}</div>
       <div class="stat-label">Всего пользователей</div>
     </div>
   </div>
@@ -149,7 +149,7 @@
       <div class="stat-icon" style="background:rgba(59,130,246,.12);color:#3b82f6">
         <i class="bi bi-arrow-down-circle"></i>
       </div>
-      <div class="stat-value">{{ (marzban_stats.get('incoming_bandwidth', 0) / 1073741824) | round(1) }} GB</div>
+      <div class="stat-value">{{ (remnawave_stats.get('incoming_bandwidth', 0) / 1073741824) | round(1) }} GB</div>
       <div class="stat-label">Входящий трафик</div>
     </div>
   </div>
@@ -158,7 +158,7 @@
       <div class="stat-icon" style="background:rgba(239,68,68,.12);color:var(--danger)">
         <i class="bi bi-arrow-up-circle"></i>
       </div>
-      <div class="stat-value">{{ (marzban_stats.get('outgoing_bandwidth', 0) / 1073741824) | round(1) }} GB</div>
+      <div class="stat-value">{{ (remnawave_stats.get('outgoing_bandwidth', 0) / 1073741824) | round(1) }} GB</div>
       <div class="stat-label">Исходящий трафик</div>
     </div>
   </div>
@@ -196,17 +196,17 @@
             <div style="font-size:.72rem;color:var(--text-muted)">Статус VPN-панели</div>
           </div>
         </div>
-        <div id="marzban-status" class="mb-3">
-          {% if marzban_ok %}
+        <div id="remnawave-status" class="mb-3">
+          {% if remnawave_ok %}
           <div class="d-flex align-items-center gap-2 mb-3" style="color:var(--success);font-size:.85rem">
             <i class="bi bi-check-circle-fill"></i><span>Подключено</span>
           </div>
-          {% if marzban_stats %}
+          {% if remnawave_stats %}
           <div class="row g-2">
             {% set items = [
-              ('bi-cpu', 'rgba(0,212,170,.12)', '#00d4aa', 'CPU', (marzban_stats.get('cpu_usage', 0) | round(1)) ~ '%'),
-              ('bi-memory', 'rgba(16,185,129,.12)', '#10b981', 'RAM', ((marzban_stats.get('mem_used', 0) / 1048576) | round(1)) ~ ' MB'),
-              ('bi-hdd', 'rgba(245,158,11,.12)', '#f59e0b', 'Disk', ((marzban_stats.get('disk_used', 0) / 1073741824) | round(1)) ~ ' GB'),
+              ('bi-cpu', 'rgba(0,212,170,.12)', '#00d4aa', 'CPU', (remnawave_stats.get('cpu_usage', 0) | round(1)) ~ '%'),
+              ('bi-memory', 'rgba(16,185,129,.12)', '#10b981', 'RAM', ((remnawave_stats.get('mem_used', 0) / 1048576) | round(1)) ~ ' MB'),
+              ('bi-hdd', 'rgba(245,158,11,.12)', '#f59e0b', 'Disk', ((remnawave_stats.get('disk_used', 0) / 1073741824) | round(1)) ~ ' GB'),
             ] %}
             {% for icon, bg, color, label, value in items %}
             <div class="col-6 col-md-4">
@@ -226,7 +226,7 @@
           {% endif %}
         </div>
         <button class="btn btn-sm btn-outline-secondary w-100"
-                hx-get="{{ panel_base }}/pasarguard/status" hx-target="#marzban-status" hx-swap="innerHTML">
+                hx-get="{{ panel_base }}/remnawave/status" hx-target="#remnawave-status" hx-swap="innerHTML">
           <i class="bi bi-arrow-repeat me-1"></i>Проверить
         </button>
       </div>
@@ -274,15 +274,15 @@
   <div class="card">
     <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
       <div>
-        <span><i class="bi bi-people me-2" style="color:var(--accent)"></i>VPN пользователи в Marzban</span>
+        <span><i class="bi bi-people me-2" style="color:var(--accent)"></i>VPN пользователи в Remnawave</span>
       </div>
-      <button class="btn btn-accent btn-sm" hx-get="{{ panel_base }}/pasarguard/users" hx-target="#pg-users-table" hx-swap="innerHTML">
+      <button class="btn btn-accent btn-sm" hx-get="{{ panel_base }}/remnawave/users" hx-target="#remnawave-users-table" hx-swap="innerHTML">
         <i class="bi bi-arrow-repeat me-1"></i>Загрузить
       </button>
     </div>
-    <div id="pg-users-table" class="p-3" style="color:var(--text-muted);font-size:.85rem"
-         hx-get="{{ panel_base }}/pasarguard/users" hx-trigger="every 30s" hx-swap="innerHTML">
-      Нажмите «Загрузить» для получения списка пользователей из Marzban.
+    <div id="remnawave-users-table" class="p-3" style="color:var(--text-muted);font-size:.85rem"
+         hx-get="{{ panel_base }}/remnawave/users" hx-trigger="every 30s" hx-swap="innerHTML">
+      Нажмите «Загрузить» для получения списка пользователей из Remnawave.
     </div>
   </div>
 </div>
@@ -293,12 +293,12 @@
     <div class="col-lg-8">
       <div class="card h-100">
         <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
-          <span><i class="bi bi-diagram-3 me-2" style="color:var(--accent)"></i>Группы Marzban</span>
-          <button class="btn btn-accent btn-sm" hx-get="{{ panel_base }}/pasarguard/groups" hx-target="#pg-groups-table" hx-swap="innerHTML">
+          <span><i class="bi bi-diagram-3 me-2" style="color:var(--accent)"></i>Группы Remnawave</span>
+          <button class="btn btn-accent btn-sm" hx-get="{{ panel_base }}/remnawave/groups" hx-target="#remnawave-groups-table" hx-swap="innerHTML">
             <i class="bi bi-arrow-repeat me-1"></i>Загрузить
           </button>
         </div>
-        <div id="pg-groups-table" class="p-3" style="color:var(--text-muted);font-size:.85rem">
+        <div id="remnawave-groups-table" class="p-3" style="color:var(--text-muted);font-size:.85rem">
           Нажмите «Загрузить» для получения групп.
         </div>
       </div>
@@ -313,7 +313,7 @@
             Группы назначаются при создании подписки
           </div>
           <form hx-post="{{ panel_base }}/telegram/groups" hx-swap="none">
-            <div id="pg-groups-list"
+            <div id="remnawave-groups-list"
                  style="min-height:40px;font-size:.8rem;color:var(--text-muted)"
                  hx-get="{{ panel_base }}/telegram/groups"
                  hx-trigger="load"
@@ -323,7 +323,7 @@
             </div>
             <div class="d-flex gap-2 mt-3">
               <button type="button" class="btn btn-sm btn-outline-secondary"
-                      hx-get="{{ panel_base }}/telegram/groups" hx-target="#pg-groups-list" hx-swap="innerHTML">
+                      hx-get="{{ panel_base }}/telegram/groups" hx-target="#remnawave-groups-list" hx-swap="innerHTML">
                 <i class="bi bi-arrow-repeat me-1"></i>Загрузить
               </button>
               <button type="submit" class="btn btn-sm btn-accent"><i class="bi bi-floppy me-1"></i>Сохранить</button>
@@ -345,12 +345,12 @@
 <div id="tab-nodes" class="tab-pane">
   <div class="card">
     <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
-      <span><i class="bi bi-server me-2" style="color:var(--accent)"></i>Ноды Marzban</span>
-      <button class="btn btn-accent btn-sm" hx-get="{{ panel_base }}/pasarguard/nodes" hx-target="#pg-nodes-table" hx-swap="innerHTML">
+      <span><i class="bi bi-server me-2" style="color:var(--accent)"></i>Ноды Remnawave</span>
+      <button class="btn btn-accent btn-sm" hx-get="{{ panel_base }}/remnawave/nodes" hx-target="#remnawave-nodes-table" hx-swap="innerHTML">
         <i class="bi bi-arrow-repeat me-1"></i>Загрузить
       </button>
     </div>
-    <div id="pg-nodes-table" class="p-3" style="color:var(--text-muted);font-size:.85rem">
+    <div id="remnawave-nodes-table" class="p-3" style="color:var(--text-muted);font-size:.85rem">
       Нажмите «Загрузить» для получения нод.
     </div>
   </div>

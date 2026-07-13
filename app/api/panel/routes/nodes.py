@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import get_db
 from app.core.config import config
-from app.services.pasarguard.pasarguard import PasarguardService
+from app.services.remnawave.remnawave_api import RemnawaveService
 
 from .shared import _require_permission, _base_ctx, _toast, templates
 
@@ -170,7 +170,7 @@ def _render_nodes_grid(nodes: list[dict[str, Any]]) -> str:
 
 
 async def _load_nodes() -> list[dict[str, Any]]:
-    svc = PasarguardService()
+    svc = RemnawaveService()
     data = await svc.get_nodes()
     if isinstance(data, dict):
         return list(data.get("nodes", []) or data.get("items", []) or [])
@@ -208,7 +208,7 @@ async def reconnect_node(node_id: int, request: Request):
     _require_permission(request, "system")
 
     try:
-        await PasarguardService().reconnect_node(node_id)
+        await RemnawaveService().reconnect_node(node_id)
         nodes = await _load_nodes()
         resp = HTMLResponse(_render_nodes_grid(nodes))
         _toast(resp, f"Нода {node_id} переподключена")
@@ -224,7 +224,7 @@ async def delete_node(
 ):
     _require_permission(request, "system")
     try:
-        await PasarguardService().remove_node(node_id)
+        await RemnawaveService().remove_node(node_id)
         nodes = await _load_nodes()
         resp = HTMLResponse(_render_nodes_grid(nodes))
         _toast(resp, f"Нода {node_id} удалена")
@@ -251,7 +251,7 @@ async def add_node(
 ):
     _require_permission(request, "system")
     try:
-        await PasarguardService().add_node(
+        await RemnawaveService().add_node(
             name=name.strip(),
             address=address.strip(),
             api_key=api_key.strip(),

@@ -1,5 +1,5 @@
 """
-Abstract interface for VPN panel backend (Marzban/Pasarguard).
+Abstract interface for VPN panel backend (Remnawave).
 All panel services must implement this interface.
 """
 
@@ -58,4 +58,9 @@ class VpnPanelInterface(ABC):
     @abstractmethod
     async def delete_user(self, username: str) -> None:
         """Permanently delete a user."""
+        ...
+
+    @abstractmethod
+    async def get_hosts(self) -> list[dict]:
+        """Return list of VPN hosts/servers."""
         ...

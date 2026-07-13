@@ -9,7 +9,7 @@ from app.bot.utils.menu import get_main_menu_kb as _get_menu_kb
 from app.bot.handlers.admin import _is_admin
 from app.core.database import AsyncSessionFactory
 from app.models.payment import PaymentStatus
-from app.services.pasarguard.pasarguard import get_vpn_panel
+from app.services.remnawave.remnawave_api import get_vpn_panel
 from app.services.vpn_key import VpnKeyService
 from app.services.bot_settings import BotSettingsService
 from app.services.i18n import t
@@ -317,7 +317,7 @@ async def show_key_detail(callback: CallbackQuery) -> None:
         access_url = key.access_url or ""
         price = str(key.price or "")
         plan_name = key.plan.name if key.plan else name
-        has_panel_key = bool((key.pasarguard_key_id or "").strip())
+        has_panel_key = bool((key.remnawave_key_id or "").strip())
 
     status_label = {
         "active": t("status_active", lang),
@@ -387,7 +387,7 @@ async def show_key_devices(callback: CallbackQuery) -> None:
             return
 
         plan_name = key.plan.name if key.plan else key.name or f"Подписка #{key.id}"
-        username = (key.pasarguard_key_id or "").strip()
+        username = (key.remnawave_key_id or "").strip()
 
     hwids_data = {"hwids": [], "count": 0}
     if username:
