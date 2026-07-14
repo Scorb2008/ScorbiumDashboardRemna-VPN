@@ -41,6 +41,18 @@ services:
     networks:
       - vpn_net
 
+  frontend:
+    build: ./frontend
+    container_name: vpn_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      app:
+        condition: service_healthy
+    networks:
+      - vpn_net
+
   nginx:
     image: nginx:alpine
     container_name: vpn_nginx

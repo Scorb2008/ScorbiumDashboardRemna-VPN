@@ -89,6 +89,29 @@ services:
     networks:
       - vpn_net
 
+  frontend:
+    build: ./frontend
+    container_name: vpn_frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      app:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 64M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+    networks:
+      - vpn_net
+
   nginx:
     image: nginx:alpine
     container_name: vpn_nginx
