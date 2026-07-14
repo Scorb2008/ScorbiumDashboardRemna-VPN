@@ -39,6 +39,34 @@ build_app_image() {
     error "Не удалось собрать app image. Если в логах есть auth.docker.io или network is unreachable, это проблема доступа Docker к registry (часто IPv6/DNS/firewall), а не логики update.sh."
 }
 
+build_frontend_image() {
+    if [[ ! -d "frontend" ]]; then
+        warn "Директория frontend/ не найдена — пропускаю сборку фронтенда"
+        return 0
+    fi
+    local attempt
+
+    for attempt in $(seq 1 "${BUILD_RETRIES}"); do
+        info "Сборка frontend через BuildKit (${attempt}/${BUILD_RETRIES})..."
+        if docker compose -f "${COMPOSE_FILE}" build frontend; then
+            return 0
+        fi
+        warn "BuildKit-сборка frontend не удалась"
+        if [[ "${attempt}" -lt "${BUILD_RETRIES}" ]]; then
+            info "Жду 5 сек и пробую снова..."
+            sleep 5
+        fi
+    done
+
+    warn "Переключаюсь на legacy builder как fallback..."
+    if DOCKER_BUILDKIT=0 COMPOSE_DOCKER_CLI_BUILD=0 docker compose -f "${COMPOSE_FILE}" build frontend; then
+        success "Сборка frontend прошла через legacy builder"
+        return 0
+    fi
+
+    error "Не удалось собрать frontend image."
+}
+
 print_recent_logs() {
     warn "Последние логи контейнеров:"
     docker compose -f "${COMPOSE_FILE}" logs app --tail=25 2>/dev/null || true
@@ -708,8 +736,9 @@ NGINXEOF
 success "nginx generated conf готов"
 
 # ── [3/4] Пересобираем и запускаем ───────────────────────────────────────────
-info "[3/4] Пересобираю app..."
+info "[3/4] Пересобираю app и frontend..."
 build_app_image
+build_frontend_image
 
 info "Очищаю старые образы..."
 docker image prune -f --filter "until=168h" >/dev/null 2>&1 || true
@@ -728,7 +757,7 @@ run_fix_alembic_and_upgrade || error "Не удалось применить м�
 success "Миграции БД применены"
 
 info "Перезапускаю контейнеры приложения..."
-docker compose -f "${COMPOSE_FILE}" up -d app
+docker compose -f "${COMPOSE_FILE}" up -d app frontend
 
 info "Жду готовности app (макс 180 сек)..."
 wait_for_container_health "vpn_app" "App" 36 5
