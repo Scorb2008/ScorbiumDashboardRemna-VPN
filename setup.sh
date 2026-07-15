@@ -577,7 +577,7 @@ http {
         }
         location ${SET_PATH_ADMIN} {
             limit_req zone=panel burst=20 nodelay;
-            proxy_pass http://vpn_frontend;
+            proxy_pass http://vpn_frontend/;
             proxy_set_header Host              \$host;
             proxy_set_header X-Forwarded-Host \$http_host;
             proxy_set_header X-Real-IP         \$remote_addr;

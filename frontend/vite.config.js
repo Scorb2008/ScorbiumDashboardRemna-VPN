@@ -12,6 +12,7 @@ export default defineConfig({
       },
     },
   },
+  base: 'relative',
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
