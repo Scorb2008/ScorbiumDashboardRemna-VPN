@@ -2,7 +2,6 @@ const BASE = '/api/v1';
 
 class ApiClient {
   #token = $state(localStorage.getItem('admin_token') || null);
-  #controller = null;
 
   get isAuthenticated() {
     return !!this.#token;
@@ -13,9 +12,6 @@ class ApiClient {
   }
 
   async request(method, path, { body, params, raw } = {}) {
-    if (this.#controller) this.#controller.abort();
-    this.#controller = new AbortController();
-
     let url = BASE + path;
     if (params) {
       const qs = new URLSearchParams();
@@ -36,7 +32,6 @@ class ApiClient {
       method,
       headers,
       body: body instanceof URLSearchParams ? body : body ? JSON.stringify(body) : undefined,
-      signal: this.#controller.signal,
     });
 
     if (res.status === 401) {

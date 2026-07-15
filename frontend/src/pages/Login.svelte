@@ -1,6 +1,6 @@
 <script>
   import { router, toasts } from '../lib/stores.js';
-  import { api } from '../lib/api.js';
+  import { api } from '../lib/api.svelte.js';
   import Spinner from '../components/Spinner.svelte';
 
   let username = $state('');

@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { api } from '../lib/api.js';
+  import { api } from '../lib/api.svelte.js';
   import { toasts } from '../lib/stores.js';
   import { formatDate, formatDateTime } from '../lib/utils.js';
   import Table from '../components/Table.svelte';

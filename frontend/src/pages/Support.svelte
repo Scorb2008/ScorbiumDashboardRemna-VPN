@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { api } from '../lib/api.js';
+  import { api } from '../lib/api.svelte.js';
   import { toasts } from '../lib/stores.js';
   import { formatDateTime, truncate } from '../lib/utils.js';
   import Modal from '../components/Modal.svelte';
@@ -25,10 +25,13 @@
     }
   }
 
-  onMount(loadTickets);
+  let initDone = $state(false);
+
+  onMount(() => { initDone = true; });
 
   $effect(() => {
-    statusFilter;
+    if (!initDone) return;
+    const _ = statusFilter;
     loadTickets();
   });
 

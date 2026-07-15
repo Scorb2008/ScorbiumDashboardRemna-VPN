@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { router } from './lib/stores.js';
-  import { api } from './lib/api.js';
+  import { api } from './lib/api.svelte.js';
   import Sidebar from './components/Sidebar.svelte';
   import Toasts from './components/Toasts.svelte';
 

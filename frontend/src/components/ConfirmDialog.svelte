@@ -1,5 +1,5 @@
 <script>
-  let { show = false, onConfirm = () => {}, onCancel = () => {}, title = 'Подтверждение', message = '', confirmText = 'Удалить', confirmClass = 'btn-error' } = $props();
+  let { show = $bindable(false), onConfirm = () => {}, onCancel = () => {}, title = 'Подтверждение', message = '', confirmText = 'Удалить', confirmClass = 'btn-error' } = $props();
 </script>
 
 {#if show}

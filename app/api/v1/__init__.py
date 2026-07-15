@@ -13,6 +13,7 @@ from .broadcasts import router as broadcasts_router
 from .telegram import router as telegram_router
 from .promos import router as promos_router
 from .referrals import router as referrals_router
+from .remnawave import router as remnawave_router
 
 
 def get_router() -> APIRouter:
@@ -34,6 +35,7 @@ def get_router() -> APIRouter:
     api_router.include_router(telegram_router, prefix="/telegram", tags=["Telegram"])
     api_router.include_router(promos_router, prefix="/promos", tags=["Promos"])
     api_router.include_router(referrals_router, prefix="/referrals", tags=["Referrals"])
+    api_router.include_router(remnawave_router, prefix="/remnawave", tags=["Remnawave"])
     api_router.include_router(users_router, prefix="/users", tags=["Users"])
 
     return api_router

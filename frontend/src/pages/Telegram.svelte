@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { api } from '../lib/api.js';
+  import { api } from '../lib/api.svelte.js';
   import { toasts } from '../lib/stores.js';
   import StatsCard from '../components/StatsCard.svelte';
   import Spinner from '../components/Spinner.svelte';

@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { api } from '../lib/api.js';
+  import { api } from '../lib/api.svelte.js';
   import { toasts } from '../lib/stores.js';
   import { formatPrice, formatDateTime } from '../lib/utils.js';
 
@@ -21,10 +21,13 @@
     }
   }
 
-  onMount(loadPayments);
+  let initDone = $state(false);
+
+  onMount(() => { initDone = true; });
 
   $effect(() => {
-    statusFilter;
+    if (!initDone) return;
+    const _ = statusFilter;
     offset = 0;
     loadPayments();
   });
