@@ -621,6 +621,11 @@ http {
         keepalive 32;
     }
 
+    upstream vpn_frontend {
+        server frontend:80;
+        keepalive 8;
+    }
+
     server {
         listen 80;
         server_name ${DOMAIN};

@@ -46,7 +46,7 @@ services:
     container_name: vpn_frontend
     restart: unless-stopped
     ports:
-      - "3000:80"
+      - "${FRONTEND_PORT:-3000}:80"
     depends_on:
       app:
         condition: service_healthy
