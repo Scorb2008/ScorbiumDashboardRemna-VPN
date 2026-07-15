@@ -104,6 +104,8 @@ def _determine_target_version(schema: dict[str, bool]) -> str:
         target = "e8f9a0b1c2d3"
     if schema.get("has_hot_path_indexes"):
         target = "f9a0b1c2d3e4"
+    if schema.get("has_remnawave_key_id"):
+        target = "a0b1c2d3e4f5"
     return target
 
 
@@ -145,6 +147,7 @@ async def main():
     has_hot_path_indexes = await _index_exists(
         conn, "ix_vpn_keys_user_status_created_at"
     ) and await _index_exists(conn, "ix_payments_status_provider_created_at")
+    has_remnawave_key_id = await _column_exists(conn, "vpn_keys", "remnawave_key_id")
 
     print("3. Schema state:")
     print(f"   - users.language   : {has_language}")
@@ -153,6 +156,7 @@ async def main():
     print(f"   - admins table     : {has_admins}")
     print(f"   - performance indexes: {has_performance_indexes}")
     print(f"   - hot path indexes   : {has_hot_path_indexes}")
+    print(f"   - remnawave_key_id  : {has_remnawave_key_id}")
     print(f"   - admin features   : {has_admin_features}")
     print(f"   - admins.totp_secret: {has_admin_totp}")
     print(f"   - admins.backup_codes: {has_admin_backup_codes}")
@@ -187,6 +191,7 @@ async def main():
                 "has_promo_usages": has_promo_usages,
                 "has_branding_assets": has_branding_assets,
                 "has_hot_path_indexes": has_hot_path_indexes,
+                "has_remnawave_key_id": has_remnawave_key_id,
             }
         )
 
