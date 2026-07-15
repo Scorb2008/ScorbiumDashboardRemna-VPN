@@ -70,6 +70,7 @@ build_frontend_image() {
 print_recent_logs() {
     warn "Последние логи контейнеров:"
     docker compose -f "${COMPOSE_FILE}" logs app --tail=25 2>/dev/null || true
+    docker compose -f "${COMPOSE_FILE}" logs frontend --tail=25 2>/dev/null || true
     docker compose -f "${COMPOSE_FILE}" logs nginx --tail=25 2>/dev/null || true
     docker compose -f "${COMPOSE_FILE}" logs db --tail=25 2>/dev/null || true
 }
@@ -467,6 +468,13 @@ run_smoke_checks() {
     run_app_http_check "/api/v1/health/" "200"
     run_app_http_check "${SET_PATH_ADMIN}" "200,302,303,307"
     run_app_http_check "/cabinet/" "200,302,303,307"
+    local frontend_status
+    frontend_status="$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' vpn_frontend 2>/dev/null || echo "unknown")"
+    if [[ "${frontend_status}" == "healthy" || "${frontend_status}" == "running" ]]; then
+        success "Frontend контейнер: ${frontend_status}"
+    else
+        warn "Frontend контейнер не готов (status=${frontend_status})"
+    fi
     success "Smoke-check пройден"
 }
 
@@ -650,7 +658,7 @@ http {
         }
         location ${SET_PATH_ADMIN} {
             limit_req zone=panel burst=20 nodelay;
-            proxy_pass http://vpn_app;
+            proxy_pass http://vpn_frontend;
             proxy_set_header Host              \$host;
             proxy_set_header X-Forwarded-Host \$http_host;
             proxy_set_header X-Real-IP         \$remote_addr;
@@ -761,6 +769,9 @@ docker compose -f "${COMPOSE_FILE}" up -d app frontend
 
 info "Жду готовности app (макс 180 сек)..."
 wait_for_container_health "vpn_app" "App" 36 5
+
+info "Жду готовности frontend (макс 60 сек)..."
+wait_for_container_health "vpn_frontend" "Frontend" 12 5
 
 # ── [4/4] Миграции ────────────────────────────────────────────────────────────
 info "[4/4] Перезапускаю nginx и выполняю smoke-check..."
