@@ -2,16 +2,13 @@
   import { toasts } from '../lib/stores.js';
 </script>
 
-<div class="toast toast-end z-[100]">
-  {#each $toasts as toast (toast.id)}
-    <div
-      class="alert shadow-lg fade-in text-sm max-w-sm"
-      class:alert-success={toast.type === 'success'}
-      class:alert-error={toast.type === 'error'}
-      class:alert-warning={toast.type === 'warning'}
-      class:alert-info={toast.type === 'info'}>
-      <span>{toast.message}</span>
-      <button class="btn btn-ghost btn-xs" onclick={() => toasts.remove(toast.id)}>✕</button>
-    </div>
-  {/each}
-</div>
+{#if $toasts.length > 0}
+  <div class="fixed bottom-5 right-5 z-[100] flex flex-col gap-2 max-w-sm">
+    {#each $toasts as toast (toast.id)}
+      <div class="alert animate-slide-up shadow-lg {toast.type === 'success' ? 'alert-success' : toast.type === 'error' ? 'alert-error' : toast.type === 'warning' ? 'alert-warning' : 'alert-info'}">
+        <span class="text-sm">{toast.message}</span>
+        <button class="btn btn-ghost btn-xs btn-circle" onclick={() => toasts.remove(toast.id)}>✕</button>
+      </div>
+    {/each}
+  </div>
+{/if}

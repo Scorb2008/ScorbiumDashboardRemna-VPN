@@ -2,29 +2,15 @@
   import { onMount } from 'svelte';
   import { api } from '../lib/api.js';
   import { toasts } from '../lib/stores.js';
+  import { formatDateTime, formatBytes } from '../lib/utils.js';
   import Table from '../components/Table.svelte';
-  import Spinner from '../components/Spinner.svelte';
   import ConfirmDialog from '../components/ConfirmDialog.svelte';
+  import Spinner from '../components/Spinner.svelte';
 
   let keys = $state([]);
   let loading = $state(true);
-  let syncing = $state(false);
   let search = $state('');
-  let showConfirm = $state(false);
-  let pendingAction = $state(null);
-  let pendingMessage = $state('');
-
-  const columns = [
-    { key: 'id', label: 'ID' },
-    { key: 'user_id', label: 'Пользователь' },
-    { key: 'name', label: 'Название' },
-    { key: 'remnawave_key_id', label: 'Panel ID' },
-    { key: 'status', label: 'Статус' },
-    { key: 'expires_at', label: 'Истекает' },
-    { key: 'download', label: 'Трафик' },
-  ];
-
-  onMount(loadKeys);
+  let confirmAction = $state(null);
 
   async function loadKeys() {
     loading = true;
@@ -37,175 +23,121 @@
     }
   }
 
-  async function handleSync() {
-    syncing = true;
-    try {
-      const result = await api.syncKeys();
-      toasts.success(`Синхронизация: ${result.synced} ключей, ${result.errors} ошибок`);
-      await loadKeys();
-    } catch (e) {
-      toasts.error('Ошибка синхронизации: ' + e.message);
-    } finally {
-      syncing = false;
-    }
-  }
-
-  function confirmRevoke(key) {
-    pendingMessage = `Отозвать ключ #${key.id} для пользователя ${key.user_id}?`;
-    pendingAction = () => doRevoke(key.id);
-    showConfirm = true;
-  }
-
-  async function doRevoke(id) {
-    try {
-      await api.revokeKey(id);
-      toasts.success('Ключ отозван');
-      await loadKeys();
-    } catch (e) {
-      toasts.error('Ошибка: ' + e.message);
-    }
-  }
-
-  function confirmDelete(key) {
-    pendingMessage = `Удалить ключ #${key.id} из Remnawave? Это необратимо.`;
-    pendingAction = () => doDelete(key.id);
-    showConfirm = true;
-  }
-
-  async function doDelete(id) {
-    try {
-      await api.deleteKey(id);
-      toasts.success('Ключ удалён');
-      await loadKeys();
-    } catch (e) {
-      toasts.error('Ошибка: ' + e.message);
-    }
-  }
-
-  async function handleExpireOutdated() {
-    try {
-      const result = await api.expireOutdated();
-      toasts.success(`Истекших ключей: ${result.expired}`);
-      await loadKeys();
-    } catch (e) {
-      toasts.error('Ошибка: ' + e.message);
-    }
-  }
+  onMount(loadKeys);
 
   let filteredKeys = $derived(
     search
-      ? keys.filter((k) =>
+      ? keys.filter(k =>
           String(k.id).includes(search) ||
           String(k.user_id).includes(search) ||
           (k.name || '').toLowerCase().includes(search.toLowerCase()) ||
-          (k.remnawave_key_id || '').toLowerCase().includes(search.toLowerCase())
-        )
+          (k.remnawave_key_id || '').includes(search))
       : keys
   );
 
-  function formatBytes(bytes) {
-    if (!bytes) return '0 B';
-    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-    let i = 0;
-    let val = bytes;
-    while (val >= 1024 && i < units.length - 1) { val /= 1024; i++; }
-    return val.toFixed(1) + ' ' + units[i];
+  function statusBadge(status) {
+    if (status === 'active') return 'badge-success';
+    if (status === 'expired') return 'badge-warning';
+    return 'badge-error';
   }
 
-  function statusBadge(status) {
-    const map = {
-      active: 'badge-success',
-      expired: 'badge-warning',
-      revoked: 'badge-error',
-    };
-    return map[status] || 'badge-ghost';
+  function statusLabel(status) {
+    if (status === 'active') return 'Активен';
+    if (status === 'expired') return 'Истёк';
+    return 'Отозван';
   }
+
+  async function handleRevoke(key) {
+    try {
+      await api.cancelSubscription(key.id);
+      toasts.success('Ключ отозван');
+      await loadKeys();
+    } catch (e) {
+      toasts.error(e.message);
+    }
+    confirmAction = null;
+  }
+
+  async function handleDelete(key) {
+    try {
+      await api.deleteKey(key.id);
+      toasts.success('Ключ удалён');
+      await loadKeys();
+    } catch (e) {
+      toasts.error(e.message);
+    }
+    confirmAction = null;
+  }
+
+  async function handleSync() {
+    try {
+      await api.syncKeys();
+      toasts.success('Синхронизация завершена');
+      await loadKeys();
+    } catch (e) {
+      toasts.error('Ошибка синхронизации: ' + e.message);
+    }
+  }
+
+  async function handleExpire() {
+    try {
+      const result = await api.expireOutdated();
+      toasts.success(`Истекло: ${result.expired}`);
+      await loadKeys();
+    } catch (e) {
+      toasts.error(e.message);
+    }
+  }
+
+  const columns = [
+    { key: 'id', label: 'ID', sortable: true },
+    { key: 'user_id', label: 'User ID', sortable: true },
+    { key: 'name', label: 'Имя', sortable: true },
+    { key: 'status', label: 'Статус', sortable: true, render: (r) => `<span class="badge badge-sm badge-glow ${statusBadge(r.status)}">${statusLabel(r.status)}</span>` },
+    { key: 'expires_at', label: 'Истекает', sortable: true, render: (r) => `<span class="text-xs text-base-content/50">${formatDateTime(r.expires_at)}</span>` },
+  ];
 </script>
 
-<div class="fade-in">
-  <div class="flex items-center justify-between mb-6">
-    <h1 class="text-2xl font-bold">VPN Ключи</h1>
-    <div class="flex gap-2">
-      <input
-        type="text"
-        bind:value={search}
-        placeholder="Поиск..."
-        class="input input-bordered input-sm w-48" />
-      <button class="btn btn-sm btn-outline" onclick={handleExpireOutdated} disabled={loading}>
-        Истекшие
-      </button>
-      <button class="btn btn-sm btn-primary" onclick={handleSync} disabled={syncing}>
-        {#if syncing}
-          <span class="loading loading-spinner loading-sm"></span>
-        {:else}
-          🔄
-        {/if}
+<Spinner {loading} />
+
+<div class="page-enter space-y-5">
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-bold">VPN Ключи</h1>
+      <p class="text-sm text-base-content/40 mt-1">{filteredKeys.length} ключей</p>
+    </div>
+    <div class="flex gap-2 flex-wrap">
+      <button onclick={handleSync} class="btn btn-primary btn-sm btn-glow gap-2">
         Синхронизация
       </button>
+      <button onclick={handleExpire} class="btn btn-warning btn-sm gap-2">
+        Истекшие
+      </button>
+      <input type="text" bind:value={search} placeholder="Поиск..." class="input input-bordered input-glass w-60" />
     </div>
   </div>
 
-  <Spinner {loading} />
-
-  {#if !loading}
-    <div class="table-container">
-      <div class="overflow-x-auto">
-        <table class="table table-zebra table-hover">
-          <thead>
-            <tr>
-              {#each columns as col}
-                <th>{col.label}</th>
-              {/each}
-              <th>Действия</th>
-            </tr>
-          </thead>
-          <tbody>
-            {#if filteredKeys.length === 0}
-              <tr>
-                <td colspan={columns.length + 1} class="text-center py-8 text-base-content/40">
-                  Нет ключей
-                </td>
-              </tr>
-            {:else}
-              {#each filteredKeys as key (key.id)}
-                <tr class="fade-in">
-                  <td class="font-mono text-sm">#{key.id}</td>
-                  <td>{key.user_id}</td>
-                  <td class="max-w-[150px] truncate">{key.name || '—'}</td>
-                  <td class="font-mono text-xs max-w-[120px] truncate">{key.remnawave_key_id || '—'}</td>
-                  <td>
-                    <span class="badge badge-sm {statusBadge(key.status)}">
-                      {key.status}
-                    </span>
-                  </td>
-                  <td class="text-sm">
-                    {key.expires_at ? new Date(key.expires_at).toLocaleDateString('ru-RU') : '∞'}
-                  </td>
-                  <td class="text-sm">{formatBytes(key.download)}</td>
-                  <td>
-                    <div class="flex gap-1">
-                      {#if key.status === 'active'}
-                        <button
-                          class="btn btn-xs btn-warning"
-                          onclick={() => confirmRevoke(key)}>
-                          Отозвать
-                        </button>
-                      {/if}
-                      <button
-                        class="btn btn-xs btn-error btn-outline"
-                        onclick={() => confirmDelete(key)}>
-                          Удалить
-                        </button>
-                    </div>
-                  </td>
-                </tr>
-              {/each}
-            {/if}
-          </tbody>
-        </table>
+  <Table columns={columns} data={filteredKeys}>
+    {#snippet actions(row)}
+      <div class="flex gap-1">
+        {#if row.status === 'active'}
+          <button class="btn btn-xs btn-warning btn-ghost" onclick={() => confirmAction = { type: 'revoke', key: row }}>Отозвать</button>
+        {/if}
+        <button class="btn btn-xs btn-error btn-ghost" onclick={() => confirmAction = { type: 'delete', key: row }}>Удалить</button>
       </div>
-    </div>
-  {/if}
+    {/snippet}
+  </Table>
 </div>
 
-<ConfirmDialog bind:show={showConfirm} onConfirm={pendingAction} title="Подтвердить" message={pendingMessage} />
+{#if confirmAction}
+  <ConfirmDialog
+    show={true}
+    title={confirmAction.type === 'revoke' ? 'Отозвать ключ?' : 'Удалить ключ?'}
+    message={confirmAction.type === 'revoke'
+      ? `Ключ #${confirmAction.key.id} будет отозван. Пользователь потеряет доступ к VPN.`
+      : `Ключ #${confirmAction.key.id} будет удалён безвозвратно из Remnawave.`}
+    confirmText={confirmAction.type === 'revoke' ? 'Отозвать' : 'Удалить'}
+    confirmClass={confirmAction.type === 'revoke' ? 'btn-warning' : 'btn-error'}
+    onConfirm={() => confirmAction.type === 'revoke' ? handleRevoke(confirmAction.key) : handleDelete(confirmAction.key)}
+    onCancel={() => confirmAction = null} />
+{/if}

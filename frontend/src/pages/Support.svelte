@@ -2,176 +2,181 @@
   import { onMount } from 'svelte';
   import { api } from '../lib/api.js';
   import { toasts } from '../lib/stores.js';
-  import Spinner from '../components/Spinner.svelte';
+  import { formatDateTime, truncate } from '../lib/utils.js';
   import Modal from '../components/Modal.svelte';
+  import Spinner from '../components/Spinner.svelte';
 
   let tickets = $state([]);
   let loading = $state(true);
-  let filter = $state('all');
-  let showReplyModal = $state(false);
+  let statusFilter = $state('');
   let selectedTicket = $state(null);
+  let showModal = $state(false);
   let replyText = $state('');
-
-  onMount(loadTickets);
+  let sendingReply = $state(false);
 
   async function loadTickets() {
     loading = true;
     try {
-      const params = { limit: 100 };
-      if (filter !== 'all') params.status = filter;
-      tickets = await api.getTickets(params);
+      tickets = await api.getTickets({ limit: 100, status: statusFilter || undefined });
     } catch (e) {
-      toasts.error('Ошибка: ' + e.message);
+      toasts.error(e.message);
     } finally {
       loading = false;
     }
   }
 
-  async function openTicket(ticket) {
-    try {
-      selectedTicket = await api.getTicket(ticket.id);
-      showReplyModal = true;
-    } catch (e) {
-      toasts.error('Ошибка: ' + e.message);
-    }
+  onMount(loadTickets);
+
+  $effect(() => {
+    statusFilter;
+    loadTickets();
+  });
+
+  function openTicket(ticket) {
+    selectedTicket = ticket;
+    showModal = true;
   }
 
   async function handleReply() {
-    if (!replyText.trim()) return;
+    if (!replyText.trim() || !selectedTicket) return;
+    sendingReply = true;
     try {
       await api.replyTicket(selectedTicket.id, replyText);
       toasts.success('Ответ отправлен');
       replyText = '';
-      showReplyModal = false;
+      selectedTicket = await api.getTicket(selectedTicket.id);
       await loadTickets();
     } catch (e) {
-      toasts.error('Ошибка: ' + e.message);
+      toasts.error(e.message);
+    } finally {
+      sendingReply = false;
     }
   }
 
-  async function changeStatus(ticket, status) {
+  async function handleClose() {
+    if (!selectedTicket) return;
     try {
-      await api.updateTicketStatus(ticket.id, status);
-      toasts.success('Статус обновлён');
+      await api.updateTicketStatus(selectedTicket.id, 'closed');
+      toasts.success('Тикет закрыт');
+      showModal = false;
       await loadTickets();
     } catch (e) {
-      toasts.error('Ошибка: ' + e.message);
+      toasts.error(e.message);
     }
   }
 
   function statusBadge(status) {
-    const map = {
-      open: 'badge-warning',
-      in_progress: 'badge-info',
-      closed: 'badge-ghost',
-    };
+    const map = { open: 'badge-warning', in_progress: 'badge-info', closed: 'badge-ghost' };
     return map[status] || 'badge-ghost';
   }
 
-  function priorityBadge(priority) {
-    const map = {
-      low: 'badge-ghost',
-      medium: 'badge-warning',
-      high: 'badge-error',
-      critical: 'badge-error',
-    };
-    return map[priority] || 'badge-ghost';
+  function statusLabel(s) {
+    const map = { open: 'Открыт', in_progress: 'В работе', closed: 'Закрыт' };
+    return map[s] || s;
   }
 
-  $effect(() => {
-    filter;
-    loadTickets();
-  });
+  function priorityBadge(p) {
+    const map = { low: 'badge-ghost', medium: 'badge-warning', high: 'badge-error' };
+    return map[p] || 'badge-ghost';
+  }
 </script>
 
-<div class="fade-in">
-  <div class="flex items-center justify-between mb-6">
-    <h1 class="text-2xl font-bold">Поддержка</h1>
-    <select bind:value={filter} class="select select-bordered select-sm">
-      <option value="all">Все</option>
+<Spinner {loading} />
+
+<div class="page-enter space-y-5">
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-bold">Поддержка</h1>
+      <p class="text-sm text-base-content/40 mt-1">{tickets.length} тикетов</p>
+    </div>
+    <select bind:value={statusFilter} class="select select-bordered select-sm input-glass">
+      <option value="">Все статусы</option>
       <option value="open">Открытые</option>
       <option value="in_progress">В работе</option>
       <option value="closed">Закрытые</option>
     </select>
   </div>
 
-  <Spinner {loading} />
-
-  {#if !loading}
-    <div class="table-container">
-      <div class="overflow-x-auto">
-        <table class="table table-zebra table-hover">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Тема</th>
-              <th>Пользователь</th>
-              <th>Приоритет</th>
-              <th>Статус</th>
-              <th>Дата</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {#if tickets.length === 0}
-              <tr>
-                <td colspan="7" class="text-center py-8 text-base-content/40">Нет тикетов</td>
-              </tr>
-            {:else}
-              {#each tickets as t (t.id)}
-                <tr class="fade-in">
-                  <td class="font-mono text-sm">#{t.id}</td>
-                  <td class="font-medium max-w-[200px] truncate">{t.subject}</td>
-                  <td>{t.user_id}</td>
-                  <td><span class="badge badge-sm {priorityBadge(t.priority)}">{t.priority}</span></td>
-                  <td><span class="badge badge-sm {statusBadge(t.status)}">{t.status}</span></td>
-                  <td class="text-sm">{t.created_at ? new Date(t.created_at).toLocaleString('ru-RU') : '—'}</td>
-                  <td>
-                    <div class="flex gap-1">
-                      <button class="btn btn-xs btn-ghost" onclick={() => openTicket(t)}>Ответить</button>
-                      {#if t.status !== 'closed'}
-                        <button class="btn btn-xs btn-ghost" onclick={() => changeStatus(t, 'closed')}>Закрыть</button>
-                      {/if}
-                    </div>
-                  </td>
-                </tr>
-              {/each}
-            {/if}
-          </tbody>
-        </table>
+  <div class="space-y-2">
+    {#if tickets.length === 0}
+      <div class="card p-12 text-center text-base-content/30">
+        <svg class="w-12 h-12 mx-auto mb-3 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+        <p>Нет тикетов</p>
       </div>
-    </div>
-  {/if}
+    {:else}
+      {#each tickets as ticket, i (ticket.id)}
+        <button
+          class="card w-full p-4 text-left hover:shadow-lg hover:shadow-primary/5 transition-all animate-fade-in cursor-pointer"
+          style="animation-delay: {i * 30}ms"
+          onclick={() => openTicket(ticket)}>
+          <div class="flex items-center gap-4">
+            <div class="flex-shrink-0">
+              <span class="badge badge-sm badge-glow {statusBadge(ticket.status)}">{statusLabel(ticket.status)}</span>
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2">
+                <h3 class="font-medium truncate">{ticket.subject}</h3>
+                <span class="badge badge-sm {priorityBadge(ticket.priority)}">{ticket.priority}</span>
+              </div>
+              <p class="text-xs text-base-content/40 mt-0.5">#{ticket.id} &middot; User #{ticket.user_id} &middot; {formatDateTime(ticket.created_at || ticket.messages?.[0]?.created_at)}</p>
+            </div>
+            <div class="flex-shrink-0 text-base-content/20">
+              <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
+            </div>
+          </div>
+        </button>
+      {/each}
+    {/if}
+  </div>
 </div>
 
-<Modal bind:open={showReplyModal} title="Тикет #{selectedTicket?.id}: {selectedTicket?.subject}" size="lg">
+<Modal bind:open={showModal} title={selectedTicket?.subject || 'Тикет'} size="lg">
   {#if selectedTicket}
     <div class="space-y-4">
-      {#if selectedTicket.messages}
-        <div class="space-y-3 max-h-64 overflow-y-auto">
-          {#each selectedTicket.messages as msg}
-              <div class="p-3 rounded-lg {msg.from_user ? 'bg-base-300' : 'bg-primary/10'}">
-              <div class="text-xs text-base-content/40 mb-1">
-                {msg.from_user ? 'Пользователь' : 'Админ'} · {msg.created_at}
-              </div>
-              <div class="text-sm">{msg.text}</div>
-            </div>
-          {/each}
+      <div class="flex items-center justify-between">
+        <span class="text-sm text-base-content/50">#{selectedTicket.id} &middot; User #{selectedTicket.user_id}</span>
+        <div class="flex gap-2">
+          <span class="badge badge-sm {priorityBadge(selectedTicket.priority)}">{selectedTicket.priority}</span>
+          {#if selectedTicket.status !== 'closed'}
+            <button class="btn btn-xs btn-ghost text-error" onclick={handleClose}>Закрыть тикет</button>
+          {/if}
         </div>
-        <div class="divider"></div>
+      </div>
+
+      <div class="divider my-0"></div>
+
+      <div class="space-y-3 max-h-64 overflow-y-auto">
+        {#each selectedTicket.messages || [] as msg}
+          <div class="p-3 rounded-xl {msg.is_admin ? 'bg-primary/5 border border-primary/10 ml-8' : 'bg-base-300/50 mr-8'}">
+            <div class="text-xs text-base-content/40 mb-1">
+              {msg.is_admin ? 'Админ' : 'Пользователь'} &middot; {formatDateTime(msg.created_at)}
+            </div>
+            <p class="text-sm whitespace-pre-wrap">{msg.text}</p>
+          </div>
+        {/each}
+      </div>
+
+      {#if selectedTicket.status !== 'closed'}
+        <div class="divider my-0"></div>
+        <div class="flex gap-2">
+          <textarea
+            bind:value={replyText}
+            class="textarea textarea-bordered input-glass flex-1 h-20"
+            placeholder="Ваш ответ..."
+            onkeydown={(e) => { if (e.key === 'Enter' && e.ctrlKey) handleReply(); }}></textarea>
+          <button
+            class="btn btn-primary btn-glow self-end"
+            disabled={!replyText.trim() || sendingReply}
+            onclick={handleReply}>
+            {#if sendingReply}
+              <span class="loading loading-spinner loading-sm"></span>
+            {:else}
+              Отправить
+            {/if}
+          </button>
+        </div>
+        <p class="text-xs text-base-content/30">Ctrl+Enter для отправки</p>
       {/if}
-      <div class="form-control">
-        <label class="label"><span class="label-text">Ответ</span></label>
-        <textarea
-          bind:value={replyText}
-          class="textarea textarea-bordered h-24"
-          placeholder="Напишите ответ..."></textarea>
-      </div>
-      <div class="flex justify-end">
-        <button class="btn btn-primary btn-sm" onclick={handleReply} disabled={!replyText.trim()}>
-          Отправить
-        </button>
-      </div>
     </div>
   {/if}
 </Modal>

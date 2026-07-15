@@ -4,50 +4,37 @@
   import { toasts } from '../lib/stores.js';
   import Table from '../components/Table.svelte';
   import Modal from '../components/Modal.svelte';
-  import Spinner from '../components/Spinner.svelte';
   import ConfirmDialog from '../components/ConfirmDialog.svelte';
+  import Spinner from '../components/Spinner.svelte';
 
   let promos = $state([]);
   let loading = $state(true);
   let showModal = $state(false);
-  let showConfirm = $state(false);
-  let pendingAction = $state(null);
-
-  let form = $state({
-    code: '', promo_type: 'percent', value: 0, max_uses: 0, plan_id: null,
-  });
-
-  const columns = [
-    { key: 'id', label: 'ID' },
-    { key: 'code', label: 'Код', sortable: true },
-    { key: 'promo_type', label: 'Тип' },
-    { key: 'value', label: 'Значение' },
-    { key: 'max_uses', label: 'Макс. использований' },
-    { key: 'used_count', label: 'Использовано' },
-    { key: 'is_active', label: 'Статус' },
-  ];
-
-  onMount(loadPromos);
+  let showDelete = $state(false);
+  let editing = $state(null);
+  let form = $state({ code: '', promo_type: 'discount', value: 0, plan_id: null, max_uses: 0 });
 
   async function loadPromos() {
     loading = true;
     try {
       promos = await api.getPromos();
     } catch (e) {
-      toasts.error('Ошибка: ' + e.message);
+      toasts.error(e.message);
     } finally {
       loading = false;
     }
   }
 
-  async function handleCreate() {
+  onMount(loadPromos);
+
+  async function handleSave() {
     try {
       await api.createPromo(form);
       toasts.success('Промокод создан');
       showModal = false;
       await loadPromos();
     } catch (e) {
-      toasts.error('Ошибка: ' + e.message);
+      toasts.error(e.message);
     }
   }
 
@@ -57,76 +44,104 @@
       toasts.success('Статус изменён');
       await loadPromos();
     } catch (e) {
-      toasts.error('Ошибка: ' + e.message);
+      toasts.error(e.message);
     }
   }
 
-  function confirmDelete(promo) {
-    pendingAction = async () => {
-      try {
-        await api.deletePromo(promo.id);
-        toasts.success('Промокод удалён');
-        await loadPromos();
-      } catch (e) {
-        toasts.error('Ошибка: ' + e.message);
-      }
-    };
-    showConfirm = true;
+  async function handleDelete() {
+    if (!editing) return;
+    try {
+      await api.deletePromo(editing.id);
+      toasts.success('Удалён');
+      showDelete = false;
+      await loadPromos();
+    } catch (e) {
+      toasts.error(e.message);
+    }
   }
+
+  function typeLabel(t) {
+    return { discount: 'Скидка', balance: 'Баланс', days: 'Дни' }[t] || t;
+  }
+
+  function typeBadge(t) {
+    return { discount: 'badge-info', balance: 'badge-success', days: 'badge-primary' }[t] || 'badge-ghost';
+  }
+
+  function valueDisplay(r) {
+    if (r.promo_type === 'days') return `${r.value} дн.`;
+    if (r.promo_type === 'discount') return `${r.value}%`;
+    return `${r.value} RUB`;
+  }
+
+  const columns = [
+    { key: 'id', label: 'ID', sortable: true },
+    { key: 'code', label: 'Код', sortable: true, render: (r) => `<span class="font-mono font-medium text-primary">${r.code}</span>` },
+    { key: 'promo_type', label: 'Тип', render: (r) => `<span class="badge badge-sm badge-glow ${typeBadge(r.promo_type)}">${typeLabel(r.promo_type)}</span>` },
+    { key: 'value', label: 'Значение', sortable: true, render: (r) => `<span class="font-medium">${valueDisplay(r)}</span>` },
+    { key: 'max_uses', label: 'Лимит', sortable: true },
+    { key: 'current_uses', label: 'Использовано', sortable: true },
+  ];
 </script>
 
-<div class="fade-in">
-  <div class="flex items-center justify-between mb-6">
-    <h1 class="text-2xl font-bold">Промокоды</h1>
-    <button class="btn btn-sm btn-primary" onclick={() => showModal = true}>+ Создать</button>
+<Spinner {loading} />
+
+<div class="page-enter space-y-5">
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold">Промокоды</h1>
+      <p class="text-sm text-base-content/40 mt-1">{promos.length} промокодов</p>
+    </div>
+    <button onclick={() => { editing = null; form = { code: '', promo_type: 'discount', value: 0, plan_id: null, max_uses: 0 }; showModal = true; }} class="btn btn-primary btn-sm btn-glow gap-2">
+      Создать
+    </button>
   </div>
 
-  <Spinner {loading} />
-
-  {#if !loading}
-    <Table {columns} data={promos}>
-      {#snippet actions(row)}
-        <div class="flex gap-1 items-center">
-          <span class="badge badge-sm" class:badge-success={row.is_active} class:badge-ghost={!row.is_active}>
-            {row.is_active ? 'Активен' : 'Выкл'}
-          </span>
-          <button class="btn btn-xs btn-ghost" onclick={() => handleToggle(row)}>Перекл.</button>
-          <button class="btn btn-xs btn-error btn-ghost" onclick={() => confirmDelete(row)}>🗑</button>
-        </div>
-      {/snippet}
-    </Table>
-  {/if}
+  <Table columns={columns} data={promos}>
+    {#snippet actions(row)}
+      <div class="flex items-center gap-2">
+        <span class="badge badge-sm {row.is_active ? 'badge-success' : 'badge-ghost'}">{row.is_active ? 'Активен' : 'Выкл'}</span>
+        <button class="btn btn-xs btn-ghost" onclick={() => handleToggle(row)}>Перекл.</button>
+        <button class="btn btn-xs btn-error btn-ghost" onclick={() => { editing = row; showDelete = true; }}>Удалить</button>
+      </div>
+    {/snippet}
+  </Table>
 </div>
 
 <Modal bind:open={showModal} title="Новый промокод" size="md">
   <div class="space-y-4">
     <div class="form-control">
-      <label class="label"><span class="label-text">Код</span></label>
-      <input type="text" bind:value={form.code} class="input input-bordered" placeholder="SUMMER2024" />
+      <label class="label"><span class="label-text text-xs font-medium">Код</span></label>
+      <input type="text" bind:value={form.code} class="input input-bordered input-glass font-mono" placeholder="SUMMER2024" />
     </div>
-    <div class="grid grid-cols-2 gap-4">
+    <div class="grid grid-cols-2 gap-3">
       <div class="form-control">
-        <label class="label"><span class="label-text">Тип</span></label>
-        <select bind:value={form.promo_type} class="select select-bordered">
-          <option value="percent">Процент</option>
-          <option value="fixed">Фиксированная сумма</option>
+        <label class="label"><span class="label-text text-xs font-medium">Тип</span></label>
+        <select bind:value={form.promo_type} class="select select-bordered input-glass">
+          <option value="discount">Скидка (%)</option>
+          <option value="balance">Баланс (RUB)</option>
           <option value="days">Дни</option>
         </select>
       </div>
       <div class="form-control">
-        <label class="label"><span class="label-text">Значение</span></label>
-        <input type="number" bind:value={form.value} class="input input-bordered" />
+        <label class="label"><span class="label-text text-xs font-medium">Значение</span></label>
+        <input type="number" bind:value={form.value} class="input input-bordered input-glass" min="0" />
       </div>
     </div>
     <div class="form-control">
-      <label class="label"><span class="label-text">Макс. использований (0 = безлимит)</span></label>
-      <input type="number" bind:value={form.max_uses} class="input input-bordered" />
+      <label class="label"><span class="label-text text-xs font-medium">Лимит (0 = безлимит)</span></label>
+      <input type="number" bind:value={form.max_uses} class="input input-bordered input-glass" min="0" />
     </div>
-    <div class="flex justify-end gap-2 mt-4">
+    <div class="flex gap-3 justify-end pt-2">
       <button class="btn btn-ghost" onclick={() => showModal = false}>Отмена</button>
-      <button class="btn btn-primary" onclick={handleCreate}>Создать</button>
+      <button class="btn btn-primary btn-glow" onclick={handleSave}>Создать</button>
     </div>
   </div>
 </Modal>
 
-<ConfirmDialog bind:show={showConfirm} onConfirm={pendingAction} title="Удалить промокод?" message="Это действие необратимо." />
+<ConfirmDialog
+  bind:show={showDelete}
+  title="Удалить промокод?"
+  message={`Промокод «${editing?.code}» будет удалён безвозвратно.`}
+  onConfirm={handleDelete}
+  onCancel={() => showDelete = false} />
