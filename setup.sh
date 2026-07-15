@@ -269,6 +269,19 @@ DEFAULT_DB_PASS=$(openssl rand -hex 16 2>/dev/null || python3 -c "import secrets
 read -rsp "Пароль БД [случайный]: " DB_PASS; echo ""; DB_PASS=${DB_PASS:-$DEFAULT_DB_PASS}
 read -rp "Внешний порт PostgreSQL [5432]: " DB_EXTERNAL_PORT; DB_EXTERNAL_PORT=${DB_EXTERNAL_PORT:-5432}
 
+echo ""
+echo -e "${BOLD}── Frontend ────────────────────────────────────────${RESET}"
+read -rp "Порт фронтенда (SPA dev-сервер) [3000]: " FRONTEND_PORT; FRONTEND_PORT=${FRONTEND_PORT:-3000}
+if [[ ! "$FRONTEND_PORT" =~ ^[0-9]+$ ]] || (( FRONTEND_PORT < 1 || FRONTEND_PORT > 65535 )); then
+    error "Порт фронтенда должен быть числом от 1 до 65535"
+fi
+if ss -tlnp 2>/dev/null | grep -q ":${FRONTEND_PORT} " || netstat -tlnp 2>/dev/null | grep -q ":${FRONTEND_PORT} "; then
+    proc=$(ss -tlnp 2>/dev/null | grep ":${FRONTEND_PORT} " | awk '{print $7}' | head -1 || echo "unknown")
+    warn "Порт ${FRONTEND_PORT} уже занят (${proc})"
+    read -rp "Продолжить с этим портом? [y/N]: " CONFIRM_FP; CONFIRM_FP=${CONFIRM_FP:-N}
+    [[ ! "$CONFIRM_FP" =~ ^[Yy]$ ]] && exit 1
+fi
+
 if [[ ! "$DB_EXTERNAL_PORT" =~ ^[0-9]+$ ]] || (( DB_EXTERNAL_PORT < 1 || DB_EXTERNAL_PORT > 65535 )); then
     error "Порт PostgreSQL должен быть числом от 1 до 65535"
 fi
@@ -460,6 +473,9 @@ HTTPS_PORT=${HTTPS_PORT}
 DOMAIN=${DOMAIN}
 SET_PATH_ADMIN=${SET_PATH_ADMIN}
 
+# ── Frontend (SPA dev port) ─────────────────────────────────────────────────
+FRONTEND_PORT=${FRONTEND_PORT}
+
 # ── Logging ───────────────────────────────────────────────────────────────────
 LOG_PATH=logs
 LOG_ROTATION=1 day
@@ -520,6 +536,11 @@ http {
         keepalive 32;
     }
 
+    upstream vpn_frontend {
+        server frontend:80;
+        keepalive 8;
+    }
+
     server {
         listen 80;
         server_name ${DOMAIN};
@@ -556,8 +577,9 @@ http {
         }
         location ${SET_PATH_ADMIN} {
             limit_req zone=panel burst=20 nodelay;
-            proxy_pass http://vpn_app;
+            proxy_pass http://vpn_frontend;
             proxy_set_header Host              \$host;
+            proxy_set_header X-Forwarded-Host \$http_host;
             proxy_set_header X-Real-IP         \$remote_addr;
             proxy_set_header X-Forwarded-For   \$proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto \$scheme;
