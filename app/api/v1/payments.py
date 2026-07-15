@@ -505,6 +505,28 @@ async def yookassa_webhook(
             )
             return {"status": "ok"}
 
+        try:
+            from app.services.yookassa import YookassaService
+
+            yk = await YookassaService.create()
+            remote_payment = await yk.get_payment(str(external_id))
+            remote_status = str(getattr(remote_payment, "status", "")).lower().strip()
+            if remote_status != "succeeded":
+                log.warning(
+                    "Yookassa webhook: API re-verification failed — "
+                    "remote status=%s for payment %s (expected succeeded)",
+                    remote_status,
+                    payment_id,
+                )
+                return {"status": "ok"}
+        except Exception as verify_err:
+            log.warning(
+                "Yookassa webhook: API re-verification error for payment %s: %s",
+                payment_id,
+                verify_err,
+            )
+            return {"status": "ok"}
+
         if payment.payment_type == PaymentType.TOPUP.value:
             result = await _finalize_topup_payment(
                 db, int(payment_id), str(external_id)
