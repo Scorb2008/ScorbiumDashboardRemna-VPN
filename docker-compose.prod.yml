@@ -130,6 +130,8 @@ services:
     depends_on:
       app:
         condition: service_healthy
+      frontend:
+        condition: service_started
     deploy:
       resources:
         limits:
