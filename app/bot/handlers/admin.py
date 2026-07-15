@@ -514,9 +514,7 @@ async def _show_admin_key_hwids(
     if username:
         try:
             panel = get_vpn_panel()
-        except Exception:
-            pass
-                hwids_data = await panel.get_hwids_by_username(username)
+            hwids_data = await panel.get_hwids_by_username(username)
         except Exception as e:
             log.warning(f"Failed to load HWIDs for key {key_id}: {e}")
 
