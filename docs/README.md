@@ -12,7 +12,7 @@
 | [configuration.md](configuration.md) | Переменные окружения |
 | [telegram-bot.md](telegram-bot.md) | Настройка и поведение Telegram-бота |
 | [panel.md](panel.md) | Админ-панель |
-| [pasarguard.md](pasarguard.md) | Интеграция с Marzban / Pasarguard |
+| [configuration.md](configuration.md) | Интеграция с Remnawave |
 | [payments.md](payments.md) | Платежные провайдеры |
 | [update.md](update.md) | Обновление проекта |
 | [faq.md](faq.md) | Частые проблемы |

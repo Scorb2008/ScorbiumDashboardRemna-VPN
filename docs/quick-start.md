@@ -48,7 +48,7 @@ Telegram Admin IDs: 123456789
   Пользователь [postgres]: postgres
   Пароль: ваш_пароль_бд
 
-PasarGuard / Marzban:
+Remnawave:
   URL панели: https://your-panel.com:8012
   Логин: admin
   Пароль: ваш_пароль
@@ -82,5 +82,5 @@ SET_PATH_ADMIN [/x7k/panel/ или Enter для автогенерации]:
 ## Следующие шаги
 
 - [Настройка Telegram бота](telegram-bot.md)
-- [Подключение Marzban](pasarguard.md)
+- [Подключение Remnawave](configuration.md)
 - [Настройка платежей](payments.md)

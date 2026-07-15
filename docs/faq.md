@@ -95,7 +95,7 @@ docker compose -f docker-compose.prod.yml exec app uv run alembic upgrade head
 
 ---
 
-### Marzban показывает 401
+### Remnawave показывает 401
 
 Токен авторизации истёк. Система автоматически обновляет его. Если проблема повторяется — проверьте логин/пароль в `.env`.
 

@@ -11,10 +11,6 @@ class DatabaseException(AppException):
     pass
 
 
-class PasarguardException(AppException):
-    pass
-
-
 class TelegramException(AppException):
     pass
 
@@ -45,19 +41,6 @@ class DatabaseInvalidError(DatabaseException):
 
 
 class DatabaseNotFoundError(DatabaseException):
-    pass
-
-
-# ====== PasarguardException ======
-class PasarguardAuthError(PasarguardException):
-    pass
-
-
-class PasarguardRequestError(PasarguardException):
-    pass
-
-
-class PasarguardValueError(PasarguardException):
     pass
 
 

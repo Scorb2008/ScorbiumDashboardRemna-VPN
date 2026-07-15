@@ -87,7 +87,7 @@ async def test_add_balance_route_commits_and_sends_notification(
     assert sent == [(sample_user.id, "💰 На ваш баланс зачислено <b>100 ₽</b>")]
 
 
-def test_node_status_meta_maps_extended_pasarguard_states():
+def test_node_status_meta_maps_extended_states():
     assert nodes_routes._node_status_meta("disconnected")[2] == "Офлайн"
     assert nodes_routes._node_status_meta("healthy")[2] == "Подключена"
     assert nodes_routes._node_status_meta("syncing")[3] == "connecting"

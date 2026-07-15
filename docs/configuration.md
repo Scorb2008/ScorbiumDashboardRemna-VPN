@@ -39,14 +39,14 @@
 
 > ⚠️ Для продакшена используйте `webhook`. Для разработки — `long`.
 
-### PasarGuard / Marzban
+### Remnawave
 
 | Переменная | Описание | Пример |
 |-----------|----------|--------|
-| `PASARGUARD_ADMIN_PANEL` | URL панели Marzban | `https://panel.example.com:8012` |
-| `PASARGUARD_ADMIN_LOGIN` | Логин администратора | `admin` |
-| `PASARGUARD_ADMIN_PASSWORD` | Пароль администратора | `password` |
-| `PASARGUARD_API_KEY` | API ключ (необязательно) | *(оставьте пустым)* |
+| `REMNAWAVE_URL_PANEL` | URL панели Remnawave | `https://panel.example.com:8012` |
+| `REMNAWAVE_ADMIN_LOGIN` | Логин администратора | `admin` |
+| `REMNAWAVE_ADMIN_PASSWORD` | Пароль администратора | `password` |
+| `REMNAWAVE_ADMIN_TOKEN` | API ключ (необязательно) | *(оставьте пустым)* |
 
 > 💡 Достаточно указать логин/пароль. API ключ необязателен.
 
@@ -98,10 +98,10 @@ TELEGRAM_TYPE_PROTOCOL=webhook
 TELEGRAM_WEBHOOK_URL=https://vpn.example.com/webhook/bot
 TELEGRAM_WEBHOOK_PATH=/webhook/bot
 
-PASARGUARD_ADMIN_PANEL=https://panel.example.com:8012
-PASARGUARD_ADMIN_LOGIN=admin
-PASARGUARD_ADMIN_PASSWORD=marzban_password
-PASARGUARD_API_KEY=
+REMNAWAVE_URL_PANEL=https://panel.example.com:8012
+REMNAWAVE_ADMIN_LOGIN=admin
+REMNAWAVE_ADMIN_PASSWORD=marzban_password
+REMNAWAVE_ADMIN_TOKEN=
 
 DB_ENGINE=postgresql
 DB_NAME=vpnbot

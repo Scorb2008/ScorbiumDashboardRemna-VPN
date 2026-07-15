@@ -9,7 +9,6 @@ class _Config:
     initialized: bool = False
     web_config: Optional[Any] = None
     telegram_config: Optional[Any] = None
-    pasarguard_config: Optional[Any] = None
     remnawave_config: Optional[Any] = None
     database_config: Optional[Any] = None
     yookassa_config: Optional[Any] = None
@@ -35,14 +34,6 @@ class _Config:
 
             self.telegram_config = telegram
         return self.telegram_config
-
-    @property
-    def pasarguard(self) -> Any:
-        if self.pasarguard_config is None:
-            from .configs import pasarguard
-
-            self.pasarguard_config = pasarguard
-        return self.pasarguard_config
 
     @property
     def remnawave(self) -> Any:
@@ -83,7 +74,6 @@ class _Config:
         log.info("Initializing all configs...")
 
         _ = self.telegram
-        _ = self.pasarguard
         _ = self.database
         _ = self.yookassa
         _ = self.utils
@@ -96,7 +86,6 @@ class _Config:
         log.info("Reloading all configs...")
 
         self.database_config = None
-        self.pasarguard_config = None
         self.remnawave_config = None
         self.telegram_config = None
         self.yookassa_config = None
@@ -122,13 +111,6 @@ class _Config:
         except Exception as e:
             results["database"] = False
             log.error(f"Error validating database settings: {e}")
-
-        try:
-            _ = self.pasarguard
-            results["pasarguard"] = True
-        except Exception as e:
-            results["pasarguard"] = False
-            log.error(f"Error validating Pasarguard settings: {e}")
 
         try:
             _ = self.remnawave
@@ -162,7 +144,7 @@ class _Config:
 
     def __repr__(self):
         return (
-            f"<Config: (telegram: {self.telegram}, pasarguard: {self.pasarguard}, "
+            f"<Config: (telegram: {self.telegram}, "
             f"remnawave: {self.remnawave_config}, database: {self.database}, "
             f"yookassa: {self.yookassa}, web: {self.web})>"
         )

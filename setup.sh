@@ -288,19 +288,18 @@ if [[ ${#DB_PASS} -lt 8 ]]; then
 fi
 
 echo ""
-echo -e "${BOLD}── VPN Panel (Marzban / Pasarguard) ─────────────────${RESET}"
-VPN_PANEL_TYPE=remnawave
+echo -e "${BOLD}── VPN Panel (Remnawave) ──────────────────────────${RESET}"
 echo ""
-read -rp "URL панели (например: https://panel.example.com:8012): " PASAR_URL
-[[ -z "$PASAR_URL" ]] && error "URL панели обязателен"
+read -rp "URL панели Remnawave (например: https://panel.example.com:8012): " REMNAWAVE_URL
+[[ -z "$REMNAWAVE_URL" ]] && error "URL панели обязателен"
 # Validate URL format
-if [[ ! "$PASAR_URL" =~ ^https?:// ]]; then
+if [[ ! "$REMNAWAVE_URL" =~ ^https?:// ]]; then
     error "URL должен начинаться с http:// или https://"
 fi
-read -rp "Логин Marzban [admin]: " PASAR_LOGIN; PASAR_LOGIN=${PASAR_LOGIN:-admin}
-read -rsp "Пароль Marzban: " PASAR_PASS; echo ""
-[[ -z "$PASAR_PASS" ]] && error "Пароль Marzban обязателен"
-success "Выбрана панель: Marzban / Pasarguard"
+read -rp "Логин админа [admin]: " REMNAWAVE_LOGIN; REMNAWAVE_LOGIN=${REMNAWAVE_LOGIN:-admin}
+read -rsp "Пароль админа: " REMNAWAVE_PASS; echo ""
+[[ -z "$REMNAWAVE_PASS" ]] && error "Пароль обязателен"
+success "Выбрана панель: Remnawave"
 
 echo ""
 echo -e "${BOLD}── YooKassa и CryptoBot ────────────────────────────${RESET}"
@@ -437,12 +436,11 @@ TELEGRAM_TYPE_PROTOCOL=${TG_PROTOCOL}
 TELEGRAM_WEBHOOK_URL=${WEBHOOK_URL}
 TELEGRAM_WEBHOOK_PATH=/webhook/bot
 
-# ── VPN Panel (Marzban / Pasarguard) ──────────────────────────────────────────
-PASARGUARD_ADMIN_PANEL=${PASAR_URL}
-PASARGUARD_ADMIN_LOGIN=${PASAR_LOGIN}
-PASARGUARD_ADMIN_PASSWORD=${PASAR_PASS}
-PASARGUARD_API_KEY=
-VPN_PANEL_TYPE=${VPN_PANEL_TYPE}
+# ── VPN Panel (Remnawave) ──────────────────────────────────────────────────
+REMNAWAVE_URL_PANEL=${REMNAWAVE_URL}
+REMNAWAVE_ADMIN_LOGIN=${REMNAWAVE_LOGIN}
+REMNAWAVE_ADMIN_PASSWORD=${REMNAWAVE_PASS}
+REMNAWAVE_ADMIN_TOKEN=
 
 # ── Database ──────────────────────────────────────────────────────────────────
 DB_ENGINE=postgresql
@@ -813,7 +811,7 @@ echo ""
 echo -e "  🌐 Панель:   ${BOLD}${CYAN}${PANEL_URL}${RESET}"
 echo -e "  👤 Логин:    ${BOLD}${WEB_USER}${RESET}"
 echo -e "  🔑 Пароль:   ${BOLD}${WEB_PASS}${RESET}"
-echo -e "  🛡️  VPN:      ${BOLD}Marzban / Pasarguard${RESET} (${PASAR_URL})"
+echo -e "  🛡️  VPN:      ${BOLD}Remnawave${RESET} (${REMNAWAVE_URL})"
 echo ""
 echo -e "  📋 Логи:    ${YELLOW}docker compose logs -f app${RESET}"
 echo -e "  🛑 Стоп:    ${YELLOW}docker compose down${RESET}"
@@ -822,5 +820,5 @@ echo ""
 echo -e "  📌 Не забудьте:"
 echo -e "     • Настроить платёжные системы в панели"
 echo -e "     • Загрузить фото для кнопок бота"
-echo -e "     • Проверить подключение к Marzban/Pasarguard"
+echo -e "     • Проверить подключение к Remnawave"
 echo ""

@@ -290,15 +290,15 @@ ensure_database_prerequisites() {
     fi
 }
 
-validate_pasarguard_url() {
+validate_panel_url() {
     local panel_url="$1"
     case "${panel_url}" in
         ""|http://|https://)
-            error "PASARGUARD_ADMIN_PANEL в .env не заполнен корректно"
+            error "REMNAWAVE_URL_PANEL в .env не заполнен корректно"
             ;;
     esac
     if [[ ! "${panel_url}" =~ ^https?://[^/]+ ]]; then
-        error "PASARGUARD_ADMIN_PANEL имеет некорректный формат: ${panel_url}"
+        error "REMNAWAVE_URL_PANEL имеет некорректный формат: ${panel_url}"
     fi
 }
 
@@ -515,7 +515,6 @@ ensure_env_var "DB_HOST" "db"
 ensure_env_var "DB_PORT" "5432"
 ensure_env_var "DB_EXTERNAL_PORT" "5432"
 ensure_env_var "DB_ENGINE" "postgresql"
-ensure_env_var "VPN_PANEL_TYPE" "remnawave"
 ensure_env_var "APP_VERSION" "1.0.0"
 ensure_env_var "LE_EMAIL" ""
 ensure_env_var "SET_PATH_ADMIN" "${SET_PATH_ADMIN}"
@@ -529,8 +528,8 @@ if ! grep -q "^ENCRYPTION_KEY=" .env || [[ -z "$(grep "^ENCRYPTION_KEY=" .env | 
     success "ENCRYPTION_KEY добавлен в .env"
 fi
 
-PASARGUARD_ADMIN_PANEL="$(read_env_trimmed "PASARGUARD_ADMIN_PANEL")"
-validate_pasarguard_url "${PASARGUARD_ADMIN_PANEL}"
+REMNAWAVE_URL="$(read_env_trimmed "REMNAWAVE_URL_PANEL")"
+validate_panel_url "${REMNAWAVE_URL}"
 
 info "Домен: ${DOMAIN}, HTTPS порт: ${HTTPS_PORT}, админ путь: ${SET_PATH_ADMIN}"
 

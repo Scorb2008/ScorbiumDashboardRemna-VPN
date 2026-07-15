@@ -230,7 +230,7 @@ async def gift_subscription(
         resp,
         f"Подписка «{plan.name}» подарена"
         if key
-        else "Ошибка создания ключа в Marzban",
+        else "Ошибка создания ключа в Remnawave",
         "success" if key else "error",
     )
     return resp
@@ -269,7 +269,7 @@ async def gift_days(
         resp,
         f"Подписка на {days} дней подарена"
         if key
-        else "Ошибка создания ключа в Marzban",
+        else "Ошибка создания ключа в Remnawave",
         "success" if key else "error",
     )
     return resp

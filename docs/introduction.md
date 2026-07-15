@@ -1,6 +1,6 @@
 # Введение
 
-**VPN Dashboard** — это комплексное решение для управления VPN-сервисом. Включает веб-панель администратора, Telegram-бота для пользователей и полную интеграцию с Marzban/PasarGuard.
+**VPN Dashboard** — это комплексное решение для управления VPN-сервисом. Включает веб-панель администратора, Telegram-бота для пользователей и полную интеграцию с Remnawave/Remnawave.
 
 ## Что умеет
 
@@ -10,7 +10,7 @@
 - Платежи, промокоды, рефералы
 - Тикет-система поддержки
 - Рассылки пользователям
-- Интеграция с Marzban (группы, ноды, пользователи)
+- Интеграция с Remnawave (группы, ноды, пользователи)
 - Визуальный редактор клавиатуры бота
 
 ### Telegram-бот
@@ -35,9 +35,9 @@
 │                    VPN Dashboard                        │
 │                                                         │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
-│  │  Web Panel   │  │  Telegram    │  │   Marzban    │  │
+│  │  Web Panel   │  │  Telegram    │  │   Remnawave    │  │
 │  │  FastAPI +   │  │    Bot       │  │  Integration │  │
-│  │  Jinja2+HTMX │  │  aiogram 3   │  │  PasarGuard  │  │
+│  │  Jinja2+HTMX │  │  aiogram 3   │  │  Remnawave  │  │
 │  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘  │
 │         └─────────────────┴─────────────────┘           │
 │                            │                            │
@@ -61,7 +61,7 @@
 | Database | PostgreSQL 15 + SQLAlchemy 2 |
 | Migrations | Alembic |
 | Frontend | Jinja2 + HTMX + Bootstrap 5.3 |
-| VPN Panel | Marzban / PasarGuard API |
+| VPN Panel | Remnawave API |
 | Payments | YooKassa, Telegram Stars |
 | Proxy | Nginx |
 | SSL | Let's Encrypt (Certbot) |

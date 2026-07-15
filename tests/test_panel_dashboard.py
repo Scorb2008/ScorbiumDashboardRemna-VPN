@@ -29,7 +29,7 @@ async def test_dashboard_renders_actual_admin_role(session, monkeypatch):
         lambda request, permission: admin_info,
     )
     monkeypatch.setattr(
-        "app.services.pasarguard.pasarguard.get_vpn_panel",
+        "app.services.remnawave.remnawave_api.get_vpn_panel",
         lambda: type(
             "FakePanel",
             (),

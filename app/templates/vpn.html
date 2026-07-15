@@ -8,7 +8,7 @@
   <button class="btn btn-sm btn-outline-secondary"
     hx-post="{{ panel_base }}/vpn/sync"
     hx-swap="none"
-    title="Синхронизировать статусы из Marzban">
+    title="Синхронизировать статусы из Remnawave">
     <i class="bi bi-arrow-repeat me-1"></i>Синхронизировать
   </button>
 </div>
@@ -20,7 +20,7 @@
         <tr>
           <th>#</th>
           <th>Пользователь</th>
-          <th>Marzban username</th>
+          <th>Username</th>
           <th>Название</th>
           <th>Ссылка подписки</th>
           <th>Статус</th>
@@ -81,8 +81,8 @@
                 hx-post="{{ panel_base }}/vpn/{{ key.id }}/delete"
                 hx-target="#vpn-key-{{ key.id }}"
                 hx-swap="outerHTML"
-                hx-confirm="Удалить ключ из Marzban навсегда?"
-                title="Удалить из Marzban">
+                hx-confirm="Удалить ключ навсегда?"
+                title="Удалить">
                 <i class="bi bi-trash"></i>
               </button>
             </div>

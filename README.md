@@ -45,7 +45,7 @@
 - Telegram Stars
 - Внутренний баланс
 - FreeKassa webhook endpoint
-- Marzban / Pasarguard API
+- Remnawave API
 
 ---
 
@@ -271,9 +271,9 @@ TELEGRAM_TYPE_PROTOCOL=webhook
 TELEGRAM_WEBHOOK_URL=https://example.com/webhook/bot
 TELEGRAM_WEBHOOK_PATH=/webhook/bot
 
-PASARGUARD_ADMIN_PANEL=https://panel.example.com:8012
-PASARGUARD_ADMIN_LOGIN=admin
-PASARGUARD_ADMIN_PASSWORD=secret
+REMNAWAVE_URL_PANEL=https://panel.example.com:8012
+REMNAWAVE_ADMIN_LOGIN=admin
+REMNAWAVE_ADMIN_PASSWORD=secret
 VPN_PANEL_TYPE=marzban
 
 DB_ENGINE=postgresql
