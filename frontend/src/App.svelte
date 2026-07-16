@@ -75,13 +75,12 @@
 
     <!-- Sidebar -->
     <aside
-      class="fixed md:relative z-30 h-full transition-all duration-300 ease-in-out
-        {sidebarOpen
-          ? 'translate-x-0'
-          : '-translate-x-full md:translate-x-0 md:w-0 md:overflow-hidden'}"
-      class:w-0 md:overflow-hidden={!sidebarOpen}
+      class="fixed md:relative z-30 h-full transition-all duration-300 ease-in-out overflow-hidden
+        {sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+        md:translate-x-0"
+      class:w-[260px]={sidebarOpen}
     >
-      <div class="w-[260px] md:w-[260px] h-full border-r border-[#2a2a35] bg-bg">
+      <div class="w-[260px] h-full border-r border-[#2a2a35] bg-bg shrink-0">
         <Sidebar bind:currentPath />
       </div>
     </aside>
@@ -104,9 +103,8 @@
       <!-- Desktop sidebar toggle -->
       <button
         onclick={toggleSidebar}
-        class="hidden md:flex fixed left-[260px] top-1/2 -translate-y-1/2 z-40 w-5 h-10 items-center justify-center rounded-r-lg bg-surface-2 border border-l-0 border-[#2a2a35] text-muted hover:text-text transition-all cursor-pointer
-          {sidebarOpen ? 'left-[260px]' : 'left-0'}"
-        style="transition: left 0.3s ease-in-out;"
+        class="hidden md:flex fixed top-1/2 -translate-y-1/2 z-40 w-5 h-10 items-center justify-center rounded-r-lg bg-surface-2 border border-l-0 border-[#2a2a35] text-muted hover:text-text transition-all duration-300 ease-in-out cursor-pointer"
+        style="left: {sidebarOpen ? '260px' : '0px'};"
       >
         <Icon name={sidebarOpen ? 'chevronLeft' : 'chevronRight'} size={14} />
       </button>
