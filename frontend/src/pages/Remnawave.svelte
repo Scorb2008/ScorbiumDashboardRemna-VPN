@@ -12,6 +12,14 @@
   let loading = $state(true);
   let activeTab = $state('overview');
 
+  let proxyMethod = $state('GET');
+  let proxyPath = $state('api/system/stats');
+  let proxyBody = $state('');
+  let proxyResponse = $state(null);
+  let proxyLoading = $state(false);
+  let proxyError = $state('');
+  let proxyHistory = $state([]);
+
   async function loadAll() {
     loading = true;
     try {
@@ -39,6 +47,24 @@
     const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  }
+
+  async function callProxy() {
+    if (!proxyPath.trim()) return;
+    proxyLoading = true;
+    proxyError = '';
+    proxyResponse = null;
+    try {
+      const body = (proxyMethod === 'POST' || proxyMethod === 'PUT' || proxyMethod === 'PATCH') && proxyBody.trim()
+        ? JSON.parse(proxyBody.trim()) : undefined;
+      const res = await api.remnawaveProxy(proxyMethod, proxyPath.trim(), body);
+      proxyResponse = res;
+      proxyHistory = [{ method: proxyMethod, path: proxyPath.trim(), time: new Date().toLocaleTimeString('ru-RU') }, ...proxyHistory].slice(0, 20);
+    } catch (e) {
+      proxyError = e.message;
+    } finally {
+      proxyLoading = false;
+    }
   }
 
   function formatUptime(seconds) {
@@ -192,6 +218,7 @@
         { id: 'overview', label: 'Обзор', icon: 'bar-chart-3' },
         { id: 'nodes', label: 'Узлы', icon: 'server' },
         { id: 'users', label: 'Пользователи', icon: 'users' },
+        { id: 'api', label: 'Full API', icon: 'terminal' },
       ] as tab}
         <button
           class="px-3.5 py-1.5 text-xs font-medium rounded-[7px] transition-all {activeTab === tab.id ? 'bg-surface text-text shadow-sm' : 'text-muted hover:text-text'}"
@@ -233,6 +260,105 @@
           <button class="btn btn-secondary mt-2" onclick={loadAll}>Обновить</button>
         </div>
       {/if}
+    {:else if activeTab === 'api'}
+      <div class="space-y-4">
+        <div class="card p-5">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-[15px] font-semibold">Запрос к API Remnawave</h3>
+            <p class="text-[11px] text-muted">Прокси через /api/v1/remnawave/proxy/</p>
+          </div>
+          <div class="flex gap-2 mb-3">
+            <select bind:value={proxyMethod} class="select w-24 text-xs font-mono">
+              <option>GET</option>
+              <option>POST</option>
+              <option>PUT</option>
+              <option>PATCH</option>
+              <option>DELETE</option>
+            </select>
+            <input type="text" bind:value={proxyPath} class="input flex-1 font-mono text-xs" placeholder="api/system/stats" />
+            <button class="btn btn-primary" onclick={callProxy} disabled={proxyLoading || !proxyPath.trim()}>
+              {#if proxyLoading}
+                <div class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+              {:else}
+                <Icon name="terminal" class="w-4 h-4" />
+              {/if}
+              Выполнить
+            </button>
+          </div>
+          {#if proxyMethod === 'POST' || proxyMethod === 'PUT' || proxyMethod === 'PATCH'}
+            <div class="mb-3">
+              <textarea bind:value={proxyBody} class="textarea w-full h-24 font-mono text-xs" placeholder="JSON body"></textarea>
+            </div>
+          {/if}
+          {#if proxyError}
+            <div class="bg-danger/10 border border-danger/20 rounded-[10px] p-3.5">
+              <p class="text-[13px] text-danger font-medium">Ошибка</p>
+              <p class="text-xs text-danger/80 mt-0.5">{proxyError}</p>
+            </div>
+          {/if}
+          {#if proxyResponse}
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <p class="text-xs text-muted">Ответ:</p>
+                <button class="btn btn-xs btn-ghost" onclick={() => navigator.clipboard.writeText(JSON.stringify(proxyResponse, null, 2))}>
+                  <Icon name="copy" class="w-3 h-3" /> Копировать
+                </button>
+              </div>
+              <pre class="bg-surface-2 rounded-[10px] p-3.5 text-[11px] font-mono text-muted overflow-x-auto max-h-96 overflow-y-auto">{
+                JSON.stringify(proxyResponse, null, 2)
+              }</pre>
+            </div>
+          {/if}
+        </div>
+
+        {#if proxyHistory.length > 0}
+          <div class="card p-5">
+            <h3 class="text-[15px] font-semibold mb-3">История запросов</h3>
+            <div class="space-y-1 max-h-48 overflow-y-auto">
+              {#each proxyHistory as h, i}
+                <div class="flex items-center gap-2.5 py-1.5 px-2.5 rounded-[7px] {i === 0 ? 'bg-surface-3' : ''}">
+                  <span class="font-mono text-[11px] font-bold text-accent min-w-[4ch]">{h.method}</span>
+                  <span class="font-mono text-xs text-muted flex-1 truncate">{h.path}</span>
+                  <span class="text-[10px] text-muted">{h.time}</span>
+                </div>
+              {/each}
+            </div>
+          </div>
+        {/if}
+
+        <div class="card p-5">
+          <h3 class="text-[15px] font-semibold mb-3">Доступные эндпоинты Remnawave</h3>
+          <p class="text-[13px] text-muted mb-3">Все эндпоинты Remnawave API доступны через прокси. Примеры:</p>
+          <div class="space-y-1.5 text-[12px] font-mono">
+            {#each [
+              { method: 'GET', path: 'api/system/stats', desc: 'Статистика системы' },
+              { method: 'GET', path: 'api/system/health', desc: 'Health check' },
+              { method: 'GET', path: 'api/nodes', desc: 'Список узлов' },
+              { method: 'GET', path: 'api/users?start=0&size=50', desc: 'Список пользователей' },
+              { method: 'GET', path: 'api/users/by-username/{username}', desc: 'Поиск пользователя' },
+              { method: 'POST', path: 'api/users', desc: 'Создать пользователя' },
+              { method: 'GET', path: 'api/hosts', desc: 'Список хостов' },
+              { method: 'GET', path: 'api/subscription-settings', desc: 'Настройки подписок' },
+              { method: 'GET', path: 'api/config-profiles', desc: 'Профили конфигурации' },
+              { method: 'GET', path: 'api/subscription-page-configs', desc: 'Страница подписки' },
+              { method: 'GET', path: 'api/subscription-templates', desc: 'Шаблоны подписок' },
+              { method: 'GET', path: 'api/snippets', desc: 'Сниппеты' },
+              { method: 'GET', path: 'api/internal-squads', desc: 'Внутренние группы' },
+              { method: 'GET', path: 'api/external-squads', desc: 'Внешние группы' },
+              { method: 'GET', path: 'api/api-tokens', desc: 'API токены' },
+              { method: 'GET', path: 'api/remnawave-settings', desc: 'Настройки Remnawave' },
+              { method: 'GET', path: 'api/system/stats/nodes', desc: 'Статистика узлов' },
+              { method: 'GET', path: 'api/system/stats/bandwidth', desc: 'Статистика трафика' },
+            ] as ep}
+              <button class="w-full flex items-center gap-2.5 py-1.5 px-2.5 rounded-[7px] hover:bg-surface-2 transition-colors" onclick={() => { proxyMethod = ep.method; proxyPath = ep.path; proxyBody = ''; activeTab = 'api'; }}>
+                <span class="font-bold text-[11px] text-accent min-w-[4ch]">{ep.method}</span>
+                <span class="text-muted flex-1 truncate">{ep.path}</span>
+                <span class="text-muted/60 text-[11px]">{ep.desc}</span>
+              </button>
+            {/each}
+          </div>
+        </div>
+      </div>
     {/if}
   {:else if !loading}
     <div class="card p-12 flex flex-col items-center gap-3 text-center">
