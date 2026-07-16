@@ -112,7 +112,7 @@
       userDetail = await api.getUser(user.id);
       activityFeed = [
         { icon: 'user', text: 'Регистрация', date: formatDateTime(userDetail.created_at) },
-        { icon: 'keyRound', text: 'Последний вход', date: formatDateTime(userDetail.last_seen) },
+        { icon: 'keyRound', text: 'Последняя активность', date: formatDateTime(userDetail.last_seen) },
       ];
     }
     catch (e) { toasts.error('Ошибка загрузки деталей'); }
@@ -434,7 +434,7 @@
             {profileTab === tab
               ? 'border-accent text-accent'
               : 'border-transparent text-muted hover:text-white hover:border-surface-4'}">
-          {tab === 'overview' ? 'Обзор' : tab === 'keys' ? 'VPN Ключи' : tab === 'payments' ? 'Платежи' : 'Сообщение'}
+          {tab === 'overview' ? 'Обзор' : tab === 'keys' ? 'Подписки' : tab === 'payments' ? 'Платежи' : 'Сообщение'}
         </button>
       {/each}
     </div>
@@ -452,7 +452,7 @@
           <div class="bg-surface-3 rounded-[10px] p-4 text-center border border-surface-4/20">
             <Icon name="keyRound" class="w-5 h-5 text-success mx-auto mb-2" />
             <p class="text-xl font-bold">{userDetail.vpn_keys_count ?? 0}</p>
-            <p class="text-[11px] text-muted mt-0.5">VPN Ключей</p>
+            <p class="text-[11px] text-muted mt-0.5">Подписок</p>
           </div>
           <div class="bg-surface-3 rounded-[10px] p-4 text-center border border-surface-4/20">
             <Icon name="creditCard" class="w-5 h-5 text-warning mx-auto mb-2" />
@@ -475,7 +475,7 @@
             ['Язык', userDetail.language || '—'],
             ['Реферальный код', userDetail.referral_code || '—'],
             ['Создан', formatDateTime(userDetail.created_at)],
-            ['Последний вход', formatDateTime(userDetail.last_seen)],
+            ['Последняя активность', formatDateTime(userDetail.last_seen)],
           ] as [label, val]}
             <div class="flex justify-between items-center px-4 py-2.5">
               <span class="text-[13px] text-muted">{label}</span>
@@ -530,7 +530,7 @@
       {#if keysLoading}
         <div class="flex justify-center py-8"><div class="w-6 h-6 border-2 border-surface-4 border-t-accent rounded-full animate-spin"></div></div>
       {:else if userKeys.length === 0}
-        <div class="text-center py-8 text-muted text-sm">Нет VPN ключей</div>
+        <div class="text-center py-8 text-muted text-sm">Нет подписок</div>
       {:else}
         <div class="space-y-2">
           {#each userKeys as key}

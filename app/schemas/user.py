@@ -30,6 +30,7 @@ class UserUpdate(BaseModel):
     full_name: Optional[str] = None
     is_active: Optional[bool] = None
     is_banned: Optional[bool] = None
+    balance: Optional[float] = None
 
 
 class UserDetail(UserRead):

@@ -16,7 +16,7 @@
   let confirmDelete = $state(false);
   let deleteTarget = $state(null);
 
-  let form = $state({ code: '', discount_percent: 0, discount_amount: 0, max_uses: 0, plan_id: null, expires_at: '', is_active: true });
+  let form = $state({ code: '', discount_type: 'percent', discount_value: 0, discount_percent: 0, discount_amount: 0, max_uses: 0, plan_id: null, expires_at: '', is_active: true });
 
   async function loadPromos() {
     loading = true;
@@ -29,19 +29,44 @@
 
   function openCreate() {
     editPromo = null;
-    form = { code: '', discount_percent: 0, discount_amount: 0, max_uses: 0, plan_id: null, expires_at: '', is_active: true };
+    form = { code: '', discount_type: 'percent', discount_value: 0, discount_percent: 0, discount_amount: 0, max_uses: 0, plan_id: null, expires_at: '', is_active: true };
     showModal = true;
   }
   function openEdit(promo) {
     editPromo = promo;
-    form = { code: promo.code || '', discount_percent: promo.discount_percent || 0, discount_amount: promo.discount_amount || 0, max_uses: promo.max_uses || 0, plan_id: promo.plan_id || null, expires_at: promo.expires_at || '', is_active: promo.is_active !== false };
+    const hasPercent = promo.discount_percent && promo.discount_percent > 0;
+    form = {
+      code: promo.code || '',
+      discount_type: hasPercent ? 'percent' : 'amount',
+      discount_value: hasPercent ? (promo.discount_percent || 0) : (promo.discount_amount || 0),
+      discount_percent: promo.discount_percent || 0,
+      discount_amount: promo.discount_amount || 0,
+      max_uses: promo.max_uses || 0,
+      plan_id: promo.plan_id || null,
+      expires_at: promo.expires_at || '',
+      is_active: promo.is_active !== false
+    };
     showModal = true;
   }
 
   async function savePromo() {
     try {
-      if (editPromo) { await api.updatePromo(editPromo.id, form); toasts.success('Промокод обновлён'); }
-      else { await api.createPromo(form); toasts.success('Промокод создан'); }
+      const payload = {
+        code: form.code,
+        max_uses: form.max_uses,
+        plan_id: form.plan_id,
+        expires_at: form.expires_at || null,
+        is_active: form.is_active,
+      };
+      if (form.discount_type === 'percent') {
+        payload.discount_percent = form.discount_value;
+        payload.discount_amount = 0;
+      } else {
+        payload.discount_amount = form.discount_value;
+        payload.discount_percent = 0;
+      }
+      if (editPromo) { await api.updatePromo(editPromo.id, payload); toasts.success('Промокод обновлён'); }
+      else { await api.createPromo(payload); toasts.success('Промокод создан'); }
       showModal = false; await loadPromos();
     } catch (e) { toasts.error(e.message); }
   }
@@ -92,12 +117,15 @@
     </div>
     <div class="grid grid-cols-2 gap-4">
       <div class="space-y-1">
-        <label class="label"><span class="label-text">Скидка %</span></label>
-        <input type="number" bind:value={form.discount_percent} class="input w-full" min="0" max="100" />
+        <label class="label"><span class="label-text">Тип скидки</span></label>
+        <select bind:value={form.discount_type} class="select w-full">
+          <option value="percent">Процент (%)</option>
+          <option value="amount">Сумма (₽)</option>
+        </select>
       </div>
       <div class="space-y-1">
-        <label class="label"><span class="label-text">Скидка ₽</span></label>
-        <input type="number" bind:value={form.discount_amount} class="input w-full" min="0" />
+        <label class="label"><span class="label-text">Значение</span></label>
+        <input type="number" bind:value={form.discount_value} class="input w-full" min="0" />
       </div>
       <div class="space-y-1">
         <label class="label"><span class="label-text">Макс. использований (0=∞)</span></label>

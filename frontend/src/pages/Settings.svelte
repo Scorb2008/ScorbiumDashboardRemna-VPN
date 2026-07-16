@@ -91,9 +91,19 @@
     if (!ps) return;
     saving[name] = true;
     try {
-      await api.configurePaymentSystem(name, { enabled: !ps.enabled });
-      ps.enabled = !ps.enabled;
-      toasts.success(`${name}: ${ps.enabled ? 'включена' : 'отключена'}`);
+      const willEnable = !ps.enabled;
+      if (willEnable) {
+        const required = PAYMENT_SYSTEMS.find(p => p.id === name)?.fields || [];
+        const empty = required.filter(f => !ps.config?.[f.key]?.trim());
+        if (empty.length > 0) {
+          toasts.warning(`Заполните поля: ${empty.map(f => f.label).join(', ')}`);
+          saving[name] = false;
+          return;
+        }
+      }
+      await api.configurePaymentSystem(name, { enabled: willEnable });
+      ps.enabled = willEnable;
+      toasts.success(`${name}: ${willEnable ? 'включена' : 'отключена'}`);
     } catch (e) { toasts.error(e.message); }
     finally { saving[name] = false; }
   }
@@ -152,25 +162,24 @@
     <p class="text-sm text-muted mt-1">Управление конфигурацией платформы</p>
   </div>
 
-  <div class="flex gap-6">
-    <!-- Sidebar -->
-    <div class="w-48 shrink-0 space-y-1">
-      {#each TABS as tab}
-        <button
-          onclick={() => activeTab = tab.id}
-          class="flex items-center gap-2.5 w-full px-3.5 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-150
-            {activeTab === tab.id
-              ? 'bg-accent/10 text-accent shadow-sm border border-accent/20'
-              : 'text-muted hover:text-[#f0f0f2] hover:bg-[#1c1c24] border border-transparent'}"
-        >
-          <Icon name={tab.icon} size={16} class={activeTab === tab.id ? 'text-accent' : 'text-muted'} />
-          {tab.label}
-        </button>
-      {/each}
-    </div>
+  <!-- Top Inner Sidebar -->
+  <div class="flex gap-1 bg-surface-2 p-1 rounded-[10px] w-fit">
+    {#each TABS as tab}
+      <button
+        onclick={() => activeTab = tab.id}
+        class="flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-[7px] transition-all
+          {activeTab === tab.id
+            ? 'bg-surface text-text shadow-sm'
+            : 'text-muted hover:text-text'}"
+      >
+        <Icon name={tab.icon} size={14} />
+        {tab.label}
+      </button>
+    {/each}
+  </div>
 
-    <!-- Content -->
-    <div class="flex-1 min-w-0">
+  <!-- Content -->
+  <div class="flex-1 min-w-0">
       {#if activeTab === 'payments'}
         <div class="space-y-4">
           <div>
@@ -224,6 +233,24 @@
                         />
                       </div>
                     {/each}
+                    {#if ps.id === 'yookassa'}
+                      <div class="space-y-1">
+                        <label class="label"><span class="label-text text-[11px]">СБП (СБП через ЮKassa)</span></label>
+                        <button
+                          onclick={async () => {
+                            const v = botSettings['ps_sbp_enabled'] === '1' ? '0' : '1';
+                            await api.updateSettings({ ps_sbp_enabled: v });
+                            botSettings['ps_sbp_enabled'] = v;
+                            toasts.success(`СБП ${v === '1' ? 'включена' : 'отключена'}`);
+                          }}
+                          class="mt-1 relative inline-flex h-6 w-10 shrink-0 cursor-pointer items-center rounded-full border border-[#2a2a35] transition-colors duration-200
+                            {botSettings['ps_sbp_enabled'] === '1' ? 'bg-accent border-accent' : 'bg-[#1c1c24]'}"
+                        >
+                          <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200
+                            {botSettings['ps_sbp_enabled'] === '1' ? 'translate-x-5' : 'translate-x-0.5'}" />
+                        </button>
+                      </div>
+                    {/if}
                   </div>
 
                   <div class="flex items-center gap-3">
@@ -421,5 +448,4 @@
         </div>
       {/if}
     </div>
-  </div>
 </div>

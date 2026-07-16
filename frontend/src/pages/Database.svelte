@@ -74,7 +74,7 @@
           </div>
         </div>
         <p class="text-2xl font-bold">{stats.vpn_keys}</p>
-        <p class="text-[11px] text-muted mt-0.5">VPN ключей</p>
+        <p class="text-[11px] text-muted mt-0.5">Подписок</p>
       </div>
       <div class="stat-card">
         <div class="flex items-center gap-2 mb-2">
@@ -141,7 +141,7 @@
 <ConfirmDialog
   bind:open={confirmClear}
   title="Очистить базу данных?"
-  message="Это удалит ВСЕХ пользователей, VPN ключи, платежи, тикеты и реферальные связи. Администраторы и настройки сохраняются."
+  message="Это удалит ВСЕХ пользователей, Подписки, платежи, тикеты и реферальные связи. Администраторы и настройки сохраняются."
   confirmText="Очистить всё"
   danger
   onConfirm={doClear} />

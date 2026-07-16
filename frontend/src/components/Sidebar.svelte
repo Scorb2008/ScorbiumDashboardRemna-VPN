@@ -16,7 +16,7 @@
       label: 'Управление',
       items: [
         { path: '/users', label: 'Пользователи', icon: 'users' },
-        { path: '/vpn', label: 'VPN Ключи', icon: 'key-round' },
+        { path: '/vpn', label: 'Подписки', icon: 'key-round' },
         { path: '/plans', label: 'Тарифы', icon: 'ticket' },
         { path: '/payments', label: 'Платежи', icon: 'wallet' },
       ],

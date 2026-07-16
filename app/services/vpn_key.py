@@ -510,3 +510,37 @@ class VpnKeyService:
                 f"{failed_disables}"
             )
         return len(keys)
+
+    async def activate(self, key_id: int) -> Optional[VpnKey]:
+        key = await self.get_by_id_for_update(key_id)
+        if not key:
+            return None
+        key.status = VpnKeyStatus.ACTIVE.value
+        await self.session.flush()
+        return key
+
+    async def deactivate(self, key_id: int) -> Optional[VpnKey]:
+        key = await self.get_by_id_for_update(key_id)
+        if not key:
+            return None
+        key.status = VpnKeyStatus.REVOKED.value
+        if key.remnawave_key_id:
+            try:
+                await self._get_panel().disable_user(key.remnawave_key_id)
+            except Exception as e:
+                log.warning(f"Failed to disable in panel: {e}")
+        await self.session.flush()
+        return key
+
+    async def delete_key(self, key_id: int) -> Optional[VpnKey]:
+        key = await self.get_by_id_for_update(key_id)
+        if not key:
+            return None
+        if key.remnawave_key_id:
+            try:
+                await self._get_panel().delete_user(key.remnawave_key_id)
+            except Exception as e:
+                log.warning(f"Failed to delete from panel: {e}")
+        await self.session.delete(key)
+        await self.session.flush()
+        return key

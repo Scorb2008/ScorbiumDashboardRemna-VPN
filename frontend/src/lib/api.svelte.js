@@ -103,6 +103,10 @@ class ApiClient {
   getSubscriptions(params) { return this.get('/subscriptions/', params); }
   getSubscription(id) { return this.get(`/subscriptions/${id}`); }
   cancelSubscription(id) { return this.post(`/subscriptions/${id}/cancel`); }
+  activateSubscription(id) { return this.post(`/subscriptions/${id}/activate`); }
+  deactivateSubscription(id) { return this.post(`/subscriptions/${id}/deactivate`); }
+  deleteSubscription(id) { return this.del(`/subscriptions/${id}`); }
+  giveSubscription(userId, planId = 0, days = 30) { return this.post('/subscriptions/give', { user_id: userId, plan_id: planId, days }); }
   expireOutdated() { return this.post('/subscriptions/expire-outdated'); }
 
   // VPN

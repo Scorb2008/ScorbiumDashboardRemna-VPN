@@ -26,7 +26,7 @@ class BulkActionBody(BaseModel):
 
 
 class GiveKeyBody(BaseModel):
-    plan_id: int
+    plan_id: int = 0
     days: int = 30
 
 
@@ -45,6 +45,8 @@ async def bulk_action(
             elif body.action == "unban":
                 await svc.unban(uid)
             elif body.action == "set_balance":
+                await svc.update(uid, UserUpdate(balance=float(body.value)))
+            elif body.action == "add_balance":
                 await svc.add_balance(uid, float(body.value))
             else:
                 continue
@@ -69,9 +71,10 @@ async def give_key(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    plan_id = body.plan_id if body.plan_id else None
     key = VpnKey(
         user_id=user_id,
-        plan_id=body.plan_id,
+        plan_id=plan_id,
         status=VpnKeyStatus.ACTIVE.value,
         expires_at=datetime.now(timezone.utc) + timedelta(days=body.days),
     )

@@ -2,7 +2,6 @@
   import { onMount } from 'svelte';
   import { api } from '../lib/api.svelte.js';
   import { toasts } from '../lib/stores.js';
-  import { formatDateTime } from '../lib/utils.js';
   import Spinner from '../components/Spinner.svelte';
   import Icon from '../components/Icon.svelte';
 
@@ -16,9 +15,16 @@
   let botShortDesc = $state('');
   let photoFile = $state(null);
   let photoUploading = $state(false);
+  let photoStatus = $state('');
   let botCommands = $state([]);
   let editingBtn = $state(null);
   let addPreset = $state('');
+  let savingOrder = $state(false);
+  let logoUploading = $state(false);
+  let sectionUploading = $state('');
+
+  let dragIndex = $state(null);
+  let dragOverIndex = $state(null);
 
   const ALL_ICONS = [
     'dashboard', 'users', 'key', 'creditCard', 'payment', 'server', 'lifeBuoy',
@@ -88,7 +94,33 @@
     'photo_about', 'photo_support', 'photo_profile', 'photo_language', 'photo_trial',
   ];
 
-  let activeButtons = $derived(BUTTON_PRESETS.filter(b => settings[`btn_${b.name}`]?.trim()));
+  let activeButtons = $derived.by(() => {
+    const orderRaw = settings['btn_order'];
+    let names;
+    if (orderRaw && typeof orderRaw === 'string' && orderRaw.trim()) {
+      names = orderRaw.split(',').map(s => s.trim()).filter(Boolean);
+    } else {
+      names = BUTTON_PRESETS.map(b => b.name);
+    }
+    const result = [];
+    const seen = new Set();
+    for (const name of names) {
+      const preset = BUTTON_PRESETS.find(b => b.name === name);
+      if (preset && settings[`btn_${preset.name}`]?.trim() && !seen.has(name)) {
+        result.push(preset);
+        seen.add(name);
+      }
+    }
+    for (const b of BUTTON_PRESETS) {
+      if (settings[`btn_${b.name}`]?.trim() && !seen.has(b.name)) {
+        result.push(b);
+        seen.add(b.name);
+      }
+    }
+    return result;
+  });
+
+  let buttonOrder = $derived(activeButtons.map(b => b.name));
 
   let currentEdit = $derived(editingBtn ? BUTTON_PRESETS.find(b => b.name === editingBtn) : null);
 
@@ -117,6 +149,13 @@
     finally { loading = false; }
   }
 
+  async function reloadSettings() {
+    try {
+      const s = await api.getSettings();
+      settings = s || {};
+    } catch (e) { /* ignore */ }
+  }
+
   onMount(loadAll);
 
   async function saveBotName() {
@@ -133,6 +172,7 @@
     settingsLoading = true;
     try {
       await api.updateSettings({ [key]: settings[key] ?? '' });
+      await reloadSettings();
       toasts.success('Сохранено');
     } catch (e) { toasts.error(e.message); }
     finally { settingsLoading = false; }
@@ -142,7 +182,23 @@
     settingsLoading = true;
     try {
       await api.updateSettings({ [key]: settings[key] ?? '' });
+      await reloadSettings();
       toasts.success('Сохранено');
+    } catch (e) { toasts.error(e.message); }
+    finally { settingsLoading = false; }
+  }
+
+  async function saveButton(name) {
+    settingsLoading = true;
+    try {
+      const updates = {
+        [`btn_${name}`]: settings[`btn_${name}`] ?? '',
+        [`btn_${name}_style`]: settings[`btn_${name}_style`] ?? '',
+        [`btn_icon_${name}`]: settings[`btn_icon_${name}`] ?? '',
+      };
+      await api.updateSettings(updates);
+      await reloadSettings();
+      toasts.success('Кнопка сохранена');
     } catch (e) { toasts.error(e.message); }
     finally { settingsLoading = false; }
   }
@@ -157,6 +213,7 @@
         updates[`btn_icon_${b.name}`] = settings[`btn_icon_${b.name}`] ?? '';
       }
       await api.updateSettings(updates);
+      await reloadSettings();
       toasts.success('Настройки кнопок сохранены');
     } catch (e) { toasts.error(e.message); }
     finally { settingsLoading = false; }
@@ -189,16 +246,25 @@
   async function handlePhotoUpload() {
     if (!photoFile) return;
     photoUploading = true;
+    photoStatus = 'uploading';
     try {
       await api.setBotPhoto(photoFile);
+      photoStatus = 'success';
       toasts.success('Фото бота обновлено');
       photoFile = null;
-    } catch (e) { toasts.error(e.message); }
+    } catch (e) {
+      photoStatus = 'error';
+      toasts.error(e.message);
+    }
     finally { photoUploading = false; }
   }
 
   async function handleDeletePhoto() {
-    try { await api.deleteBotPhoto(); toasts.success('Фото бота удалено'); }
+    try {
+      await api.deleteBotPhoto();
+      botInfo = { ...botInfo, photo_url: null };
+      toasts.success('Фото бота удалено');
+    }
     catch (e) { toasts.error(e.message); }
   }
 
@@ -217,22 +283,106 @@
   async function uploadLogoFile(e) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      settings.logo_url = ev.target.result;
-    };
-    reader.readAsDataURL(file);
+    logoUploading = true;
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      await api.updateSettings({ logo_url: dataUrl });
+      settings.logo_url = dataUrl;
+      await reloadSettings();
+      toasts.success('Логотип загружен');
+    } catch (err) {
+      toasts.error(err.message);
+    } finally {
+      logoUploading = false;
+      e.target.value = '';
+    }
+  }
+
+  async function saveLogoUrl() {
+    settingsLoading = true;
+    try {
+      await api.updateSettings({ logo_url: settings.logo_url ?? '' });
+      await reloadSettings();
+      toasts.success('URL логотипа сохранён');
+    } catch (e) { toasts.error(e.message); }
+    finally { settingsLoading = false; }
   }
 
   async function uploadSectionPhoto(key, e) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      settings[key] = ev.target.result;
-    };
-    reader.readAsDataURL(file);
+    sectionUploading = key;
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      await api.updateSettings({ [key]: dataUrl });
+      settings[key] = dataUrl;
+      await reloadSettings();
+      toasts.success(`Фото ${key} загружено`);
+    } catch (err) {
+      toasts.error(err.message);
+    } finally {
+      sectionUploading = '';
+      e.target.value = '';
+    }
   }
+
+  function fileToDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (ev) => resolve(ev.target.result);
+      reader.onerror = () => reject(new Error('Ошибка чтения файла'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function handleDragStart(e, index) {
+    dragIndex = index;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', index);
+  }
+
+  function handleDragOver(e, index) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    dragOverIndex = index;
+  }
+
+  function handleDrop(e, index) {
+    e.preventDefault();
+    if (dragIndex === null || dragIndex === index) {
+      dragIndex = null;
+      dragOverIndex = null;
+      return;
+    }
+    const ordered = [...buttonOrder];
+    const [moved] = ordered.splice(dragIndex, 1);
+    ordered.splice(index, 0, moved);
+    settings['btn_order'] = ordered.join(',');
+    dragIndex = null;
+    dragOverIndex = null;
+  }
+
+  function handleDragEnd() {
+    dragIndex = null;
+    dragOverIndex = null;
+  }
+
+  async function saveButtonOrder() {
+    savingOrder = true;
+    try {
+      await api.updateSettings({ btn_order: buttonOrder.join(',') });
+      await reloadSettings();
+      toasts.success('Порядок кнопок сохранён');
+    } catch (e) { toasts.error(e.message); }
+    finally { savingOrder = false; }
+  }
+
+  const TAB_CONFIG = [
+    { id: 'branding', icon: 'fileText', label: 'Брендирование' },
+    { id: 'buttons', icon: 'layoutDashboard', label: 'Кнопки' },
+    { id: 'media', icon: 'camera', label: 'Медиа' },
+    { id: 'commands', icon: 'terminal', label: 'Команды' },
+  ];
 </script>
 
 <Spinner {loading} />
@@ -257,14 +407,15 @@
   </div>
 
   <div class="flex gap-1 border-b border-surface-4/30 overflow-x-auto">
-    {#each ['branding', 'buttons', 'media', 'commands'] as t}
+    {#each TAB_CONFIG as tc}
       <button
-        onclick={() => { tab = t; editingBtn = null; }}
-        class="px-5 py-2.5 text-[13px] font-medium whitespace-nowrap border-b-2 transition-colors
-          {tab === t
+        onclick={() => { tab = tc.id; editingBtn = null; }}
+        class="flex items-center gap-2 px-5 py-2.5 text-[13px] font-medium whitespace-nowrap border-b-2 transition-colors
+          {tab === tc.id
             ? 'border-accent text-accent'
             : 'border-transparent text-muted hover:text-white hover:border-surface-4'}">
-        {t === 'branding' ? '🎨 Брендирование' : t === 'buttons' ? '🔘 Кнопки' : t === 'media' ? '📷 Медиа' : '⚙️ Команды'}
+        <Icon name={tc.icon} class="w-4 h-4" />
+        {tc.label}
       </button>
     {/each}
   </div>
@@ -355,44 +506,138 @@
           <h3 class="text-[15px] font-semibold flex items-center gap-2"><Icon name="layoutDashboard" class="w-4 h-4 text-accent" /> Чат-превью</h3>
           <p class="text-[13px] text-muted">Как ваши кнопки выглядят в Telegram</p>
 
-          <div class="bg-[#17212b] rounded-[14px] p-5 max-w-[420px] mx-auto">
-            <div class="bg-[#2b5278] text-white/90 rounded-[10px] px-3.5 py-2.5 text-sm max-w-[80%] shadow-sm">
-              Выберите действие:
+          <div class="flex justify-center">
+            <div class="bg-[#0f0f0f] rounded-[36px] p-3 shadow-xl border border-surface-4/30 w-[375px] max-w-full">
+              <div class="bg-[#17212b] rounded-[28px] overflow-hidden">
+                <div class="flex items-center justify-center h-6 bg-[#0f0f0f]">
+                  <div class="w-[120px] h-[5px] bg-surface-4/50 rounded-full"></div>
+                </div>
+                <div class="px-3 pb-1 pt-0.5 flex items-center gap-2 bg-[#17212b]">
+                  <div class="w-6 h-6 rounded-full bg-accent/30 flex items-center justify-center">
+                    <Icon name="bot" class="w-3 h-3 text-accent" />
+                  </div>
+                  <div class="text-[11px] font-medium text-white/80">{botInfo?.first_name || 'Bot'}</div>
+                  <div class="flex-1"></div>
+                  <div class="text-white/40 text-[10px]">{new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</div>
+                </div>
+                <div class="px-3 py-2 min-h-[240px] flex flex-col">
+                  <div class="bg-[#2b5278] text-white/90 rounded-[12px] px-3 py-2 text-[13px] max-w-[80%] self-start shadow-sm leading-relaxed">
+                    Выберите действие:
+                  </div>
+                  {#if activeButtons.length > 0}
+                    <div class="flex flex-wrap justify-center gap-1.5 mt-2">
+                      {#each activeButtons as btn}
+                        {@const style = settings[`btn_${btn.name}_style`] || ''}
+                        {@const icon = settings[`btn_icon_${btn.name}`] || ''}
+                        <button
+                          onclick={() => selectButton(btn.name)}
+                          class="flex items-center gap-1.5 px-3 py-2 rounded-[10px] text-[12px] font-medium transition-all
+                            {!style ? 'bg-white/10 text-white/80' : style === 'primary' ? 'bg-accent/85 text-white' : style === 'success' ? 'bg-[#22c55e]/70 text-white' : 'bg-[#ef4450]/70 text-white'}">
+                          {#if icon}
+                            <Icon name={icon} class="w-3.5 h-3.5 shrink-0" />
+                          {/if}
+                          <span class="truncate max-w-[80px]">{settings[`btn_${btn.name}`]}</span>
+                        </button>
+                      {/each}
+                    </div>
+                  {:else}
+                    <div class="flex-1 flex items-center justify-center text-[12px] text-white/30">
+                      Нет кнопок
+                    </div>
+                  {/if}
+                  <div class="flex-1"></div>
+                  <div class="flex justify-center mt-1">
+                    <div class="w-[30px] h-[3px] bg-white/20 rounded-full"></div>
+                  </div>
+                </div>
+              </div>
             </div>
-            {#if activeButtons.length > 0}
-              <div class="grid grid-cols-2 gap-2 mt-4">
-                {#each activeButtons as btn}
-                  {@const style = settings[`btn_${btn.name}_style`] || ''}
-                  {@const icon = settings[`btn_icon_${btn.name}`] || ''}
-                  <button
-                    onclick={() => selectButton(btn.name)}
-                    class="flex items-center gap-2 px-3.5 py-2.5 rounded-[10px] text-sm font-medium transition-all duration-150
-                      {editingBtn === btn.name
-                        ? 'ring-2 ring-accent bg-accent/10'
-                        : 'hover:bg-white/10'}
-                      {!style ? 'bg-white/8 text-white/80' : style === 'primary' ? 'bg-accent/85 text-white' : style === 'success' ? 'bg-success/70 text-white' : 'bg-danger/70 text-white'}">
-                    {#if icon}
-                      <Icon name={icon} class="w-4 h-4 shrink-0" />
-                    {/if}
-                    <span class="truncate">{settings[`btn_${btn.name}`]}</span>
-                    <span class="w-2 h-2 rounded-full shrink-0" style="background: {BTN_STYLE_COLORS[style] || '#8a8a9e'}"></span>
-                  </button>
-                {/each}
-              </div>
-            {:else}
-              <div class="mt-4 text-center py-6 text-muted text-sm border border-dashed border-surface-4/40 rounded-[10px]">
-                Нет активных кнопок. Добавьте кнопку ниже.
-              </div>
-            {/if}
           </div>
         </div>
 
+        <div class="card p-5 space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="text-[15px] font-semibold flex items-center gap-2">
+              <Icon name="clipboard" class="w-4 h-4 text-accent" /> Активные кнопки
+            </h3>
+            <button onclick={saveButtonOrder} disabled={savingOrder} class="btn btn-primary btn-xs">
+              {savingOrder ? '...' : 'Сохранить порядок'}
+            </button>
+          </div>
+          <p class="text-[13px] text-muted">Перетащите кнопки для изменения порядка</p>
+          <div class="space-y-1.5">
+            {#each activeButtons as btn, i (btn.name)}
+              {@const style = settings[`btn_${btn.name}_style`] || ''}
+              {@const icon = settings[`btn_icon_${btn.name}`] || ''}
+              <div
+                draggable="true"
+                ondragstart={(e) => handleDragStart(e, i)}
+                ondragover={(e) => handleDragOver(e, i)}
+                ondrop={(e) => handleDrop(e, i)}
+                ondragend={handleDragEnd}
+                class="flex items-center gap-2 p-2.5 rounded-[10px] border cursor-pointer transition-all select-none
+                  {editingBtn === btn.name
+                    ? 'border-accent/40 bg-accent/8'
+                    : 'border-surface-4/20 bg-surface-3/40 hover:bg-surface-3/60 hover:border-surface-4/30'}
+                  {dragOverIndex === i ? '!border-accent/60 ring-1 ring-accent/30' : ''}
+                  {dragIndex === i ? 'opacity-40' : ''}"
+                onclick={() => selectButton(btn.name)}>
+                <span class="cursor-grab active:cursor-grabbing text-muted hover:text-white shrink-0">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0">
+                    <line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="18" x2="16" y2="18"/>
+                  </svg>
+                </span>
+                {#if icon}
+                  <div class="w-7 h-7 rounded-[7px] bg-surface-3 border border-surface-4/50 flex items-center justify-center shrink-0">
+                    <Icon name={icon} class="w-3.5 h-3.5 text-muted" />
+                  </div>
+                {:else}
+                  <div class="w-7 h-7 rounded-[7px] bg-surface-3 border border-surface-4/50 flex items-center justify-center shrink-0">
+                    <span class="text-[10px] text-muted">{btn.label[0]}</span>
+                  </div>
+                {/if}
+                <div class="flex-1 min-w-0">
+                  <p class="text-[13px] font-medium truncate">{settings[`btn_${btn.name}`] || btn.label}</p>
+                  <p class="text-[10px] text-muted font-mono">{btn.name}</p>
+                </div>
+                {#if style}
+                  <span class="w-2 h-2 rounded-full shrink-0" style="background: {BTN_STYLE_COLORS[style] || '#8a8a9e'}"></span>
+                {/if}
+              </div>
+            {/each}
+          </div>
+          {#if activeButtons.length === 0}
+            <p class="text-sm text-muted text-center py-4">Нет активных кнопок. Добавьте кнопку ниже.</p>
+          {/if}
+        </div>
+
+        {#if !editingBtn}
+          <div class="card p-5 space-y-4">
+            <h4 class="text-[14px] font-semibold flex items-center gap-2">
+              <Icon name="plus" class="w-4 h-4 text-accent" /> Добавить кнопку
+            </h4>
+            <div class="flex gap-2">
+              <select bind:value={addPreset} class="select flex-1">
+                <option value="">— Выберите кнопку —</option>
+                {#each BUTTON_PRESETS as p}
+                  <option value={p.name}>{p.label}</option>
+                {/each}
+              </select>
+              <button onclick={addButtonByPreset} disabled={!addPreset} class="btn btn-primary btn-sm">
+                <Icon name="plus" class="w-3.5 h-3.5" /> Добавить
+              </button>
+            </div>
+          </div>
+        {/if}
+      </div>
+
+      <div class="lg:col-span-2 space-y-4">
         {#if currentEdit}
           <div class="card p-5 space-y-4 animate-fade-in">
             <div class="flex items-center justify-between">
               <h4 class="text-[14px] font-semibold flex items-center gap-2">
                 <Icon name="edit" class="w-4 h-4 text-accent" />
-                Редактирование: {currentEdit.label}
+                Настройка: {currentEdit.label}
               </h4>
               <button onclick={() => editingBtn = null} class="btn btn-ghost btn-xs">
                 <Icon name="x" class="w-3.5 h-3.5" />
@@ -429,79 +674,26 @@
               </div>
               <div class="flex gap-2 pt-2">
                 <button onclick={() => deleteButton(currentEdit.name)} class="btn btn-danger btn-sm">
-                  <Icon name="trash" class="w-3.5 h-3.5" /> Удалить кнопку
+                  <Icon name="trash" class="w-3.5 h-3.5" /> Удалить
                 </button>
-                <button onclick={saveAllButtons} disabled={settingsLoading} class="btn btn-primary btn-sm">
-                  {settingsLoading ? '...' : 'Сохранить'}
+                <button onclick={() => saveButton(currentEdit.name)} disabled={settingsLoading} class="btn btn-primary btn-sm flex-1">
+                  {settingsLoading ? '...' : 'Сохранить кнопку'}
                 </button>
               </div>
             </div>
           </div>
-        {/if}
-
-        {#if !editingBtn}
-          <div class="card p-5 space-y-4">
-            <h4 class="text-[14px] font-semibold flex items-center gap-2">
-              <Icon name="plus" class="w-4 h-4 text-accent" /> Добавить кнопку
-            </h4>
-            <div class="flex gap-2">
-              <select bind:value={addPreset} class="select flex-1">
-                <option value="">— Выберите кнопку —</option>
-                {#each BUTTON_PRESETS as p}
-                  <option value={p.name}>{p.label}</option>
-                {/each}
-              </select>
-              <button onclick={addButtonByPreset} disabled={!addPreset} class="btn btn-primary btn-sm">
-                <Icon name="plus" class="w-3.5 h-3.5" /> Добавить
-              </button>
-            </div>
+        {:else}
+          <div class="card p-5 space-y-3">
+            <h3 class="text-[15px] font-semibold flex items-center gap-2">
+              <Icon name="settings" class="w-4 h-4 text-accent" /> Все настройки
+            </h3>
+            <p class="text-[13px] text-muted">Выберите кнопку слева для редактирования</p>
+            <button onclick={saveAllButtons} disabled={settingsLoading} class="btn btn-primary w-full">
+              {#if settingsLoading}<div class="w-4 h-4 border-2 border-surface-4 border-t-white rounded-full animate-spin"></div>{/if}
+              Сохранить все кнопки
+            </button>
           </div>
         {/if}
-      </div>
-
-      <div class="lg:col-span-2 space-y-4">
-        <div class="card p-5 space-y-3">
-          <h3 class="text-[15px] font-semibold flex items-center gap-2"><Icon name="list" class="w-4 h-4 text-accent" /> Все кнопки</h3>
-          <p class="text-[13px] text-muted">Быстрый просмотр и управление всеми кнопками</p>
-          <div class="space-y-2 max-h-[400px] overflow-y-auto pr-1">
-            {#each BUTTON_PRESETS as btn}
-              {@const text = settings[`btn_${btn.name}`] || ''}
-              {@const style = settings[`btn_${btn.name}_style`] || ''}
-              {@const icon = settings[`btn_icon_${btn.name}`] || ''}
-              <div
-                onclick={() => selectButton(btn.name)}
-                class="flex items-center gap-3 p-2.5 rounded-[10px] cursor-pointer transition-all border
-                  {editingBtn === btn.name
-                    ? 'border-accent/40 bg-accent/8'
-                    : 'border-transparent hover:bg-surface-3/60 hover:border-surface-4/30'}
-                  {!text ? 'opacity-40' : ''}">
-                {#if icon}
-                  <div class="w-8 h-8 rounded-[8px] bg-surface-3 border border-surface-4 flex items-center justify-center shrink-0">
-                    <Icon name={icon} class="w-4 h-4 text-muted" />
-                  </div>
-                {:else}
-                  <div class="w-8 h-8 rounded-[8px] bg-surface-3 border border-surface-4 flex items-center justify-center shrink-0">
-                    <span class="text-xs text-muted">{btn.label[0]}</span>
-                  </div>
-                {/if}
-                <div class="flex-1 min-w-0">
-                  <p class="text-[13px] font-medium truncate">{text || btn.label}</p>
-                  <p class="text-[10px] text-muted font-mono">{btn.name}</p>
-                </div>
-                {#if style}
-                  <span class="w-2 h-2 rounded-full shrink-0" style="background: {BTN_STYLE_COLORS[style] || '#8a8a9e'}"></span>
-                {/if}
-              </div>
-            {/each}
-          </div>
-        </div>
-
-        <div class="card p-5 space-y-3">
-          <button onclick={saveAllButtons} disabled={settingsLoading} class="btn btn-primary w-full">
-            {#if settingsLoading}<div class="w-4 h-4 border-2 border-surface-4 border-t-white rounded-full animate-spin"></div>{/if}
-            Сохранить все кнопки
-          </button>
-        </div>
       </div>
     </div>
 
@@ -521,12 +713,30 @@
             {/if}
           </div>
           <div class="flex-1 space-y-2">
-            <input type="file" accept="image/png,image/jpeg" onchange={(e) => photoFile = e.target.files?.[0] || null} class="text-sm text-muted file:mr-3 file:py-1.5 file:px-3 file:rounded-[8px] file:border-0 file:text-xs file:font-medium file:bg-accent file:text-white hover:file:bg-accent-hover" />
-            <div class="flex gap-2 flex-wrap">
+            <input
+              type="file"
+              accept="image/png,image/jpeg"
+              onchange={(e) => { photoFile = e.target.files?.[0] || null; photoStatus = ''; }}
+              class="text-sm text-muted file:mr-3 file:py-1.5 file:px-3 file:rounded-[8px] file:border-0 file:text-xs file:font-medium file:bg-accent file:text-white hover:file:bg-accent-hover" />
+            <div class="flex gap-2 flex-wrap items-center">
               <button onclick={handlePhotoUpload} disabled={!photoFile || photoUploading} class="btn btn-primary btn-sm">
-                {photoUploading ? 'Загрузка...' : 'Загрузить фото'}
+                {#if photoUploading}
+                  <div class="flex items-center gap-1.5">
+                    <div class="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    Загрузка...
+                  </div>
+                {:else}
+                  Загрузить фото
+                {/if}
               </button>
               <button onclick={handleDeletePhoto} class="btn btn-danger btn-sm">Удалить фото</button>
+              {#if photoStatus === 'success'}
+                <span class="text-[12px] text-green-400 flex items-center gap-1">
+                  <Icon name="check" class="w-3 h-3" /> Обновлено
+                </span>
+              {:else if photoStatus === 'error'}
+                <span class="text-[12px] text-red-400">Ошибка</span>
+              {/if}
             </div>
           </div>
         </div>
@@ -546,9 +756,25 @@
           <div class="flex-1 space-y-2">
             <input type="text" bind:value={settings.logo_url} class="input w-full" placeholder="URL логотипа или data:image/..." />
             <div class="flex gap-2">
-              <input type="file" accept="image/*" onchange={(e) => uploadLogoFile(e)} class="text-sm text-muted file:mr-3 file:py-1.5 file:px-3 file:rounded-[8px] file:border-0 file:text-xs file:font-medium file:bg-accent file:text-white hover:file:bg-accent-hover" />
-              <button onclick={() => saveMessage('logo_url')} disabled={settingsLoading} class="btn btn-primary btn-sm">Сохранить URL</button>
+              <input
+                type="file"
+                accept="image/*"
+                onchange={uploadLogoFile}
+                class="text-sm text-muted file:mr-3 file:py-1.5 file:px-3 file:rounded-[8px] file:border-0 file:text-xs file:font-medium file:bg-accent file:text-white hover:file:bg-accent-hover" />
+              <button onclick={saveLogoUrl} disabled={settingsLoading} class="btn btn-primary btn-sm">
+                {#if settingsLoading}
+                  <div class="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                {:else}
+                  Сохранить URL
+                {/if}
+              </button>
             </div>
+            {#if logoUploading}
+              <div class="flex items-center gap-2 text-[12px] text-accent">
+                <div class="w-3.5 h-3.5 border-2 border-accent/30 border-t-accent rounded-full animate-spin"></div>
+                Загрузка файла...
+              </div>
+            {/if}
           </div>
         </div>
       </div>
@@ -569,9 +795,17 @@
               <code class="text-[10px] font-mono text-muted block truncate">{photoKey}</code>
               <input type="text" bind:value={settings[photoKey]} class="input text-[11px] w-full mt-1.5" placeholder="URL фото" />
               <div class="flex gap-1 mt-1.5">
-                <button onclick={() => saveMessage(photoKey)} class="btn btn-ghost btn-xs flex-1">OK</button>
+                <button onclick={() => saveMessage(photoKey)} class="btn btn-ghost btn-xs flex-1" disabled={settingsLoading}>
+                  {#if sectionUploading === photoKey}
+                    <div class="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto"></div>
+                  {:else}
+                    OK
+                  {/if}
+                </button>
                 <input type="file" accept="image/*" onchange={(e) => uploadSectionPhoto(photoKey, e)} class="hidden" id="upload-{photoKey}" />
-                <label for="upload-{photoKey}" class="btn btn-ghost btn-xs cursor-pointer">Загрузить</label>
+                <label for="upload-{photoKey}" class="btn btn-ghost btn-xs cursor-pointer">
+                  {sectionUploading === photoKey ? '...' : 'Загрузить'}
+                </label>
               </div>
             </div>
           {/each}
