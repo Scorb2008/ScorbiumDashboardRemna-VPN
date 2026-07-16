@@ -35,6 +35,15 @@
     { icon: 'keyRound', text: 'Последнее действие', date: null },
   ]);
 
+  let massActionsOpen = $state(false);
+  let selectedUsers = $state(new Set());
+  let plans = $state([]);
+  let plansLoading = $state(false);
+  let bulkBalanceValue = $state('');
+  let giveKeyPlanId = $state('');
+  let giveKeyDays = $state('30');
+  let bulkSaving = $state(false);
+
   async function loadUsers() {
     loading = true;
     try { users = await api.getUsers({ limit: 500 }); }
@@ -42,7 +51,17 @@
     finally { loading = false; }
   }
 
-  onMount(loadUsers);
+  async function loadPlans() {
+    plansLoading = true;
+    try { plans = await api.getPlans({}); }
+    catch (e) { toasts.error('Ошибка загрузки тарифов'); }
+    finally { plansLoading = false; }
+  }
+
+  onMount(() => {
+    loadUsers();
+    loadPlans();
+  });
 
   let filteredUsers = $derived(
     search
@@ -52,6 +71,35 @@
           String(u.id).includes(search))
       : users
   );
+
+  let allSelected = $derived(
+    filteredUsers.length > 0 && selectedUsers.size === filteredUsers.length
+  );
+  let someSelected = $derived(
+    filteredUsers.length > 0 && selectedUsers.size > 0 && !allSelected
+  );
+
+  function toggleSelectAll() {
+    if (allSelected) {
+      selectedUsers = new Set();
+    } else {
+      selectedUsers = new Set(filteredUsers.map(u => u.id));
+    }
+  }
+
+  function toggleUser(id) {
+    const next = new Set(selectedUsers);
+    if (next.has(id)) {
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
+    selectedUsers = next;
+  }
+
+  function clearSelection() {
+    selectedUsers = new Set();
+  }
 
   async function openDetail(user) {
     selectedUser = user;
@@ -142,6 +190,46 @@
     if (val === 'banned' || val === 'Забанен' || val === 'expired') return 'badge-danger';
     return 'badge-warning';
   }
+
+  async function handleBulkAction(action, value = '') {
+    const ids = Array.from(selectedUsers);
+    if (ids.length === 0) return toasts.warning('Выберите пользователей');
+    bulkSaving = true;
+    try {
+      await api.bulkAction(ids, action, value);
+      toasts.success(`Действие "${action}" выполнено для ${ids.length} пользователей`);
+      clearSelection();
+      await loadUsers();
+    } catch (e) { toasts.error(e.message); }
+    finally { bulkSaving = false; }
+  }
+
+  async function handleBulkGiveKey() {
+    const ids = Array.from(selectedUsers);
+    if (ids.length === 0) return toasts.warning('Выберите пользователей');
+    if (!giveKeyPlanId) return toasts.warning('Выберите тариф');
+    const days = parseInt(giveKeyDays) || 30;
+    bulkSaving = true;
+    let success = 0;
+    let failed = 0;
+    for (const userId of ids) {
+      try {
+        await api.giveKey(userId, giveKeyPlanId, days);
+        success++;
+      } catch (e) {
+        failed++;
+      }
+    }
+    if (success > 0) toasts.success(`Ключи выданы ${success} пользователям`);
+    if (failed > 0) toasts.error(`Ошибка у ${failed} пользователей`);
+    clearSelection();
+    bulkSaving = false;
+  }
+
+  function toggleMassActions() {
+    massActionsOpen = !massActionsOpen;
+    if (!massActionsOpen) clearSelection();
+  }
 </script>
 
 <Spinner {loading} />
@@ -152,16 +240,163 @@
       <h1 class="text-[28px] font-bold tracking-tight">Пользователи</h1>
       <p class="text-sm text-muted mt-1">{filteredUsers.length} из {users.length}</p>
     </div>
-    <input type="text" bind:value={search} placeholder="Поиск по ID, username, имени..." class="input w-full sm:w-80" />
+    <div class="flex gap-3 w-full sm:w-auto">
+      <button onclick={toggleMassActions} class="btn btn-sm {massActionsOpen ? 'btn-primary' : 'btn-secondary'}">
+        <Icon name="checkCircle" size={16} class={massActionsOpen ? 'text-white' : 'text-muted'} />
+        Массовые действия
+        {#if massActionsOpen}
+          <Icon name="chevronUp" size={14} />
+        {:else}
+          <Icon name="chevronDown" size={14} />
+        {/if}
+      </button>
+      <input type="text" bind:value={search} placeholder="Поиск по ID, username, имени..." class="input w-full sm:w-80" />
+    </div>
   </div>
 
-  <Table columns={columns} data={filteredUsers} onRowClick={openDetail}>
-    {#snippet actions(row)}
-      <span class="badge {row.is_banned ? 'badge-danger' : 'badge-success'}">
-        {row.is_banned ? 'Забанен' : 'Активен'}
-      </span>
-    {/snippet}
-  </Table>
+  {#if massActionsOpen}
+    <!-- Mass Actions Panel -->
+    <div class="card overflow-hidden">
+      <div class="p-4 border-b border-surface-4/30 flex items-center justify-between bg-surface-3/30">
+        <div class="flex items-center gap-3">
+          <label class="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              indeterminate={someSelected}
+              onchange={toggleSelectAll}
+              class="w-4 h-4 rounded border-surface-4 bg-surface-3 accent-accent"
+            />
+            <span class="text-[13px] font-medium">Выбрать всех</span>
+          </label>
+          <span class="text-xs text-muted">Выбрано: {selectedUsers.size}</span>
+        </div>
+        {#if selectedUsers.size > 0}
+          <button onclick={clearSelection} class="btn btn-ghost btn-xs text-muted">Очистить</button>
+        {/if}
+      </div>
+
+      {#if filteredUsers.length === 0}
+        <div class="px-5 py-16 text-center text-sm text-muted">Пользователи не найдены</div>
+      {:else}
+        <div class="divide-y divide-surface-4/20 max-h-[500px] overflow-y-auto">
+          {#each filteredUsers as user (user.id)}
+            <div
+              class="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-surface-3/40 cursor-pointer"
+              onclick={() => toggleUser(user.id)}>
+              <input
+                type="checkbox"
+                checked={selectedUsers.has(user.id)}
+                onchange={() => toggleUser(user.id)}
+                onclick={(e) => e.stopPropagation()}
+                class="w-4 h-4 rounded border-surface-4 bg-surface-3 accent-accent shrink-0"
+              />
+              <div class="w-8 h-8 rounded-[10px] bg-gradient-to-br from-accent to-accent/60 flex items-center justify-center text-sm font-bold text-white shrink-0">
+                {(user.full_name || user.username || '?')[0].toUpperCase()}
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="text-[13px] font-medium">{user.full_name || 'Без имени'}</span>
+                  <span class="text-[11px] font-mono text-zinc-500">#{user.id}</span>
+                  {#if user.username}
+                    <span class="text-[11px] text-zinc-400">@{user.username}</span>
+                  {/if}
+                </div>
+                <div class="flex items-center gap-3 mt-0.5">
+                  <span class="text-xs font-medium">{formatPrice(user.balance ?? 0)}</span>
+                  <span class="text-[10px] text-muted">{formatDate(user.created_at)}</span>
+                </div>
+              </div>
+              <span class="badge {user.is_banned ? 'badge-danger' : 'badge-success'} text-[10px]">
+                {user.is_banned ? 'Забанен' : 'Активен'}
+              </span>
+            </div>
+          {/each}
+        </div>
+      {/if}
+
+      <!-- Bulk Action Controls -->
+      <div class="p-4 border-t border-surface-4/30 bg-surface-3/20">
+        <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
+          <!-- Balance -->
+          <div class="flex items-center gap-2">
+            <input
+              type="number"
+              step="0.01"
+              bind:value={bulkBalanceValue}
+              placeholder="Сумма"
+              class="input w-28"
+            />
+            <button
+              onclick={() => handleBulkAction('set_balance', bulkBalanceValue)}
+              disabled={bulkSaving || !bulkBalanceValue || selectedUsers.size === 0}
+              class="btn btn-primary btn-sm whitespace-nowrap">
+              <Icon name="wallet" size={14} />
+              Установить баланс
+            </button>
+          </div>
+
+          <div class="flex items-center gap-2 flex-wrap">
+            <!-- Ban -->
+            <button
+              onclick={() => handleBulkAction('ban')}
+              disabled={bulkSaving || selectedUsers.size === 0}
+              class="btn btn-danger btn-sm">
+              <Icon name="userX" size={14} />
+              Забанить
+            </button>
+
+            <!-- Unban -->
+            <button
+              onclick={() => handleBulkAction('unban')}
+              disabled={bulkSaving || selectedUsers.size === 0}
+              class="btn btn-sm"
+              class:btn-secondary={true}>
+              <Icon name="userCheck" size={14} />
+              Разбанить
+            </button>
+
+            <!-- Give Key -->
+            <div class="flex items-center gap-2">
+              <select bind:value={giveKeyPlanId} class="select w-36 text-xs" disabled={plansLoading}>
+                <option value="">Тариф...</option>
+                {#each plans as plan}
+                  <option value={plan.id}>{plan.name}</option>
+                {/each}
+              </select>
+              <input
+                type="number"
+                bind:value={giveKeyDays}
+                placeholder="Дни"
+                class="input w-16"
+                min="1"
+              />
+              <button
+                onclick={handleBulkGiveKey}
+                disabled={bulkSaving || selectedUsers.size === 0 || !giveKeyPlanId}
+                class="btn btn-success btn-sm">
+                <Icon name="keyRound" size={14} />
+                {bulkSaving ? '...' : 'Выдать ключ'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  {#if massActionsOpen}
+    <!-- Count when mass actions is open (no table shown) -->
+    <p class="text-xs text-muted text-center">Таблица скрыта в режиме массовых действий</p>
+  {:else}
+    <Table columns={columns} data={filteredUsers} onRowClick={openDetail}>
+      {#snippet actions(row)}
+        <span class="badge {row.is_banned ? 'badge-danger' : 'badge-success'}">
+          {row.is_banned ? 'Забанен' : 'Активен'}
+        </span>
+      {/snippet}
+    </Table>
+  {/if}
 </div>
 
 <Modal bind:open={showModal} title="Профиль пользователя" size="xl">

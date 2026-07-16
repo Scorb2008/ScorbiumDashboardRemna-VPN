@@ -88,6 +88,8 @@ class ApiClient {
   sendMessage(userId, text) { return this.post(`/users/${userId}/message`, { text }); }
   getUserKeys(userId) { return this.get(`/users/${userId}/keys`); }
   getUserPayments(userId) { return this.get(`/users/${userId}/payments`); }
+  bulkAction(userIds, action, value = '') { return this.post('/users/bulk', { user_ids: userIds, action, value }); }
+  giveKey(userId, planId, days = 30) { return this.post(`/users/${userId}/give-key`, { plan_id: planId, days }); }
 
   // Plans
   getPlans(params) { return this.get('/plans/', params); }

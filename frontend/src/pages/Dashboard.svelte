@@ -8,10 +8,16 @@
 
   let stats = $state(null);
   let loading = $state(true);
+  let logoUrl = $state('');
 
   onMount(async () => {
     try {
-      stats = await api.getDashboard();
+      const [s, settings] = await Promise.all([
+        api.getDashboard(),
+        api.getSettings().catch(() => ({})),
+      ]);
+      stats = s;
+      logoUrl = settings?.logo_url || '';
     } catch (e) {
       console.error(e);
     } finally {
@@ -24,9 +30,14 @@
 
 <div class="page-enter space-y-6">
   <div class="flex items-center justify-between">
-    <div>
-      <h1 class="text-[28px] font-bold tracking-tight text-text">Обзор</h1>
-      <p class="text-sm text-muted mt-1">Главная панель управления</p>
+    <div class="flex items-center gap-4">
+      {#if logoUrl}
+        <img src={logoUrl} alt="Logo" class="w-10 h-10 rounded-[12px] object-cover" />
+      {/if}
+      <div>
+        <h1 class="text-[28px] font-bold tracking-tight text-text">Обзор</h1>
+        <p class="text-sm text-muted mt-1">Главная панель управления</p>
+      </div>
     </div>
     <div class="flex items-center gap-2">
       <div class="w-2 h-2 rounded-full bg-success animate-pulse-glow"></div>

@@ -19,6 +19,68 @@ class SendMessageBody(BaseModel):
     parse_mode: str = "HTML"
 
 
+class BulkActionBody(BaseModel):
+    user_ids: list[int]
+    action: str  # ban, unban, set_balance
+    value: str = ""
+
+
+class GiveKeyBody(BaseModel):
+    plan_id: int
+    days: int = 30
+
+
+@router.post("/bulk", summary="Bulk action on users")
+async def bulk_action(
+    body: BulkActionBody,
+    db: AsyncSession = Depends(get_db),
+    _: str = Depends(get_current_admin),
+) -> dict:
+    svc = UserService(db)
+    results = {"success": 0, "errors": 0}
+    for uid in body.user_ids:
+        try:
+            if body.action == "ban":
+                await svc.ban(uid)
+            elif body.action == "unban":
+                await svc.unban(uid)
+            elif body.action == "set_balance":
+                await svc.add_balance(uid, float(body.value))
+            else:
+                continue
+            results["success"] += 1
+        except Exception:
+            results["errors"] += 1
+    await db.commit()
+    return results
+
+
+@router.post("/{user_id}/give-key", summary="Issue VPN key to user")
+async def give_key(
+    user_id: int,
+    body: GiveKeyBody,
+    db: AsyncSession = Depends(get_db),
+    _: str = Depends(get_current_admin),
+) -> dict:
+    from datetime import datetime, timedelta, timezone
+    from app.models.vpn_key import VpnKey, VpnKeyStatus
+
+    user = await UserService(db).get_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    key = VpnKey(
+        user_id=user_id,
+        plan_id=body.plan_id,
+        status=VpnKeyStatus.ACTIVE.value,
+        expires_at=datetime.now(timezone.utc) + timedelta(days=body.days),
+    )
+    db.add(key)
+    await db.commit()
+    await db.refresh(key)
+    return {"ok": True, "key_id": key.id, "user_id": user_id}
+
+
 @router.get("/", response_model=list[UserRead], summary="List users")
 async def list_users(
     limit: int = 100,
