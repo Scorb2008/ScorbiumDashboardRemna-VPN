@@ -6,6 +6,8 @@
   import Table from '../components/Table.svelte';
   import Icon from '../components/Icon.svelte';
 
+  let baseUrl = $state('');
+  let token = $state('');
   let status = $state(null);
   let nodes = $state([]);
   let remnawaveUsers = $state([]);
@@ -20,25 +22,72 @@
   let proxyError = $state('');
   let proxyHistory = $state([]);
 
+  async function getToken() {
+    const data = await api.getRemnawaveConnect();
+    baseUrl = data.base_url;
+    token = data.token;
+  }
+
+  async function remnawaveFetch(method, path, body) {
+    if (!token) await getToken();
+    const res = await fetch(`${baseUrl}/${path.replace(/^\//, '')}`, {
+      method,
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    if (res.status === 401) {
+      token = '';
+      const data = await api.getRemnawaveConnect();
+      baseUrl = data.base_url;
+      token = data.token;
+      return remnawaveFetch(method, path, body);
+    }
+    if (res.status === 204) return null;
+    return res.json();
+  }
+
   async function loadAll() {
     loading = true;
     try {
+      await getToken();
       const [s, n, u] = await Promise.all([
-        api.getRemnawaveStatus().catch(() => null),
-        api.getRemnawaveNodes().catch(() => []),
-        api.getRemnawaveUsers().catch(() => []),
+        remnawaveFetch('GET', 'api/system/stats').catch(() => null),
+        remnawaveFetch('GET', 'api/nodes').then(d => d?.nodes || []).catch(() => []),
+        remnawaveFetch('GET', 'api/users?start=0&size=100').then(d => d?.users || []).catch(() => []),
       ]);
-      status = s;
-      nodes = Array.isArray(n) ? n : (n?.nodes || []);
-      remnawaveUsers = Array.isArray(u) ? u : (u?.users || []);
+      status = s ? { connected: true, stats: s } : { connected: false };
+      nodes = n;
+      remnawaveUsers = u;
     } catch (e) {
-      toasts.error('Ошибка загрузки Remnawave: ' + e.message);
+      toasts.error('Ошибка подключения к Remnawave: ' + e.message);
+      status = { connected: false, error: e.message };
     } finally {
       loading = false;
     }
   }
 
   onMount(loadAll);
+
+  async function callDirect() {
+    if (!proxyPath.trim()) return;
+    proxyLoading = true;
+    proxyError = '';
+    proxyResponse = null;
+    try {
+      const body = (proxyMethod === 'POST' || proxyMethod === 'PUT' || proxyMethod === 'PATCH') && proxyBody.trim()
+        ? JSON.parse(proxyBody.trim()) : undefined;
+      const res = await remnawaveFetch(proxyMethod, proxyPath.trim(), body);
+      proxyResponse = res;
+      proxyHistory = [{ method: proxyMethod, path: proxyPath.trim(), time: new Date().toLocaleTimeString('ru-RU') }, ...proxyHistory].slice(0, 20);
+    } catch (e) {
+      proxyError = e.message;
+    } finally {
+      proxyLoading = false;
+    }
+  }
 
   function formatBytes(bytes) {
     if (!bytes && bytes !== 0) return '—';
@@ -47,24 +96,6 @@
     const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-  }
-
-  async function callProxy() {
-    if (!proxyPath.trim()) return;
-    proxyLoading = true;
-    proxyError = '';
-    proxyResponse = null;
-    try {
-      const body = (proxyMethod === 'POST' || proxyMethod === 'PUT' || proxyMethod === 'PATCH') && proxyBody.trim()
-        ? JSON.parse(proxyBody.trim()) : undefined;
-      const res = await api.remnawaveProxy(proxyMethod, proxyPath.trim(), body);
-      proxyResponse = res;
-      proxyHistory = [{ method: proxyMethod, path: proxyPath.trim(), time: new Date().toLocaleTimeString('ru-RU') }, ...proxyHistory].slice(0, 20);
-    } catch (e) {
-      proxyError = e.message;
-    } finally {
-      proxyLoading = false;
-    }
   }
 
   function formatUptime(seconds) {
@@ -125,13 +156,21 @@
   <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
     <div>
       <h1 class="text-[28px] font-bold tracking-tight text-text">Remnawave</h1>
-      <p class="text-sm text-muted mt-1">Состояние VPN панели и управление</p>
+      <p class="text-sm text-muted mt-1">Прямое подключение к API Remnawave</p>
     </div>
     <button class="btn btn-secondary" onclick={loadAll} disabled={loading}>
       <Icon name="refresh-cw" class="w-4 h-4" />
       Обновить
     </button>
   </div>
+
+  {#if baseUrl}
+    <div class="card p-3 flex items-center gap-2.5 text-xs text-muted">
+      <Icon name="link" class="w-3.5 h-3.5" />
+      Подключено к: <code class="font-mono text-accent">{baseUrl}</code>
+      <span class="w-1.5 h-1.5 rounded-full bg-success ml-1"></span>
+    </div>
+  {/if}
 
   {#if status}
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -168,7 +207,7 @@
             <Icon name="hard-drive" class="w-4 h-4 text-accent" />
           </div>
         </div>
-        <p class="text-2xl font-bold">{formatBytes(status.stats?.total_users ?? 0)}</p>
+        <p class="text-2xl font-bold">{status.stats?.total_users ?? '—'}</p>
         <p class="text-[11px] text-muted mt-0.5">Всего пользователей</p>
       </div>
     </div>
@@ -187,10 +226,10 @@
           </div>
         {/if}
         {#if status.stats.mem_used != null && status.stats.mem_total != null}
+          {@const memPct = Math.round((status.stats.mem_used / status.stats.mem_total) * 100)}
           <div class="card p-4">
             <p class="text-[11px] text-muted">Память</p>
             <div class="mt-1.5 flex items-center gap-2">
-              @const memPct = Math.round((status.stats.mem_used / status.stats.mem_total) * 100)
               <div class="flex-1 h-1.5 bg-surface-3 rounded-full overflow-hidden">
                 <div class="h-full rounded-full bg-warning transition-all" style="width: {memPct}%"></div>
               </div>
@@ -245,7 +284,7 @@
         <div class="card p-10 flex flex-col items-center gap-3 text-center">
           <Icon name="server" class="w-10 h-10 text-muted" />
           <p class="text-[15px] font-medium">Нет данных об узлах</p>
-          <p class="text-[13px] text-muted">Узлы Remnawave не найдены или API недоступно</p>
+          <p class="text-[13px] text-muted">Узлы Remnawave не найдены</p>
           <button class="btn btn-secondary mt-2" onclick={loadAll}>Обновить</button>
         </div>
       {/if}
@@ -264,8 +303,8 @@
       <div class="space-y-4">
         <div class="card p-5">
           <div class="flex items-center justify-between mb-4">
-            <h3 class="text-[15px] font-semibold">Запрос к API Remnawave</h3>
-            <p class="text-[11px] text-muted">Прокси через /api/v1/remnawave/proxy/</p>
+            <h3 class="text-[15px] font-semibold">Прямой вызов API Remnawave</h3>
+            <p class="text-[11px] text-muted">Использует токен из /api/v1/remnawave/connect</p>
           </div>
           <div class="flex gap-2 mb-3">
             <select bind:value={proxyMethod} class="select w-24 text-xs font-mono">
@@ -276,7 +315,7 @@
               <option>DELETE</option>
             </select>
             <input type="text" bind:value={proxyPath} class="input flex-1 font-mono text-xs" placeholder="api/system/stats" />
-            <button class="btn btn-primary" onclick={callProxy} disabled={proxyLoading || !proxyPath.trim()}>
+            <button class="btn btn-primary" onclick={callDirect} disabled={proxyLoading || !proxyPath.trim()}>
               {#if proxyLoading}
                 <div class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
               {:else}
@@ -328,7 +367,7 @@
 
         <div class="card p-5">
           <h3 class="text-[15px] font-semibold mb-3">Доступные эндпоинты Remnawave</h3>
-          <p class="text-[13px] text-muted mb-3">Все эндпоинты Remnawave API доступны через прокси. Примеры:</p>
+          <p class="text-[13px] text-muted mb-3">Все эндпоинты Remnawave API доступны напрямую через браузер. Примеры:</p>
           <div class="space-y-1.5 text-[12px] font-mono">
             {#each [
               { method: 'GET', path: 'api/system/stats', desc: 'Статистика системы' },
@@ -337,17 +376,16 @@
               { method: 'GET', path: 'api/users?start=0&size=50', desc: 'Список пользователей' },
               { method: 'GET', path: 'api/users/by-username/{username}', desc: 'Поиск пользователя' },
               { method: 'POST', path: 'api/users', desc: 'Создать пользователя' },
+              { method: 'PATCH', path: 'api/users/{uuid}', desc: 'Изменить пользователя' },
+              { method: 'POST', path: 'api/users/{uuid}/actions/revoke', desc: 'Отозвать ключ' },
+              { method: 'POST', path: 'api/users/{uuid}/actions/reset-traffic', desc: 'Сбросить трафик' },
               { method: 'GET', path: 'api/hosts', desc: 'Список хостов' },
               { method: 'GET', path: 'api/subscription-settings', desc: 'Настройки подписок' },
               { method: 'GET', path: 'api/config-profiles', desc: 'Профили конфигурации' },
-              { method: 'GET', path: 'api/subscription-page-configs', desc: 'Страница подписки' },
-              { method: 'GET', path: 'api/subscription-templates', desc: 'Шаблоны подписок' },
               { method: 'GET', path: 'api/snippets', desc: 'Сниппеты' },
               { method: 'GET', path: 'api/internal-squads', desc: 'Внутренние группы' },
               { method: 'GET', path: 'api/external-squads', desc: 'Внешние группы' },
-              { method: 'GET', path: 'api/api-tokens', desc: 'API токены' },
               { method: 'GET', path: 'api/remnawave-settings', desc: 'Настройки Remnawave' },
-              { method: 'GET', path: 'api/system/stats/nodes', desc: 'Статистика узлов' },
               { method: 'GET', path: 'api/system/stats/bandwidth', desc: 'Статистика трафика' },
             ] as ep}
               <button class="w-full flex items-center gap-2.5 py-1.5 px-2.5 rounded-[7px] hover:bg-surface-2 transition-colors" onclick={() => { proxyMethod = ep.method; proxyPath = ep.path; proxyBody = ''; activeTab = 'api'; }}>
@@ -366,7 +404,7 @@
         <Icon name="wifi-off" class="w-7 h-7 text-danger" />
       </div>
       <p class="text-[17px] font-semibold">Не удалось подключиться к Remnawave</p>
-      <p class="text-[13px] text-muted max-w-md">Проверьте настройки подключения к Remnawave панели в файле .env (REMNAWAVE_ADMIN_PANEL, REMNAWAVE_ADMIN_LOGIN/PASSWORD)</p>
+      <p class="text-[13px] text-muted max-w-md">Проверьте настройки в .env (REMNAWAVE_ADMIN_PANEL + REMNAWAVE_ADMIN_TOKEN или REMNAWAVE_ADMIN_LOGIN/PASSWORD)</p>
       <button class="btn btn-primary mt-2" onclick={loadAll}>
         <Icon name="refresh-cw" class="w-4 h-4" />
         Повторить

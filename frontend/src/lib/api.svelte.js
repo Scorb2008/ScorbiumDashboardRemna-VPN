@@ -144,9 +144,7 @@ class ApiClient {
 
   // Remnawave
   getRemnawaveStatus() { return this.get('/remnawave/status'); }
-  getRemnawaveNodes() { return this.get('/remnawave/nodes'); }
-  getRemnawaveUsers() { return this.get('/remnawave/users'); }
-  remnawaveProxy(method, path, body) { return this.request(method, `/remnawave/proxy/${path}`, { body }); }
+  getRemnawaveConnect() { return this.get('/remnawave/connect'); }
 
   // Admins
   getAdmins() { return this.get('/admins/'); }
