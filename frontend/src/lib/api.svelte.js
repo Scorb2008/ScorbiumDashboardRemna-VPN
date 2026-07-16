@@ -23,7 +23,7 @@ class ApiClient {
     }
 
     const headers = {};
-    if (body && !(body instanceof URLSearchParams)) {
+    if (body && !(body instanceof URLSearchParams) && !(body instanceof FormData)) {
       headers['Content-Type'] = 'application/json';
     }
     if (this.#token) headers['Authorization'] = `Bearer ${this.#token}`;
@@ -56,6 +56,9 @@ class ApiClient {
   post(path, body) { return this.request('POST', path, { body }); }
   patch(path, body) { return this.request('PATCH', path, { body }); }
   del(path) { return this.request('DELETE', path); }
+  upload(path, formData) {
+    return this.request('POST', path, { body: formData });
+  }
 
   async login(username, password) {
     const form = new URLSearchParams();
@@ -101,7 +104,7 @@ class ApiClient {
   expireOutdated() { return this.post('/subscriptions/expire-outdated'); }
 
   // VPN
-  getVpnKeys(userId) { return this.get(`/vpn/${userId}/keys`); }
+  getVpnKeys(params = {}) { return this.get('/vpn/keys', params); }
   revokeKey(id) { return this.del(`/vpn/keys/${id}`); }
   deleteKey(id) { return this.del(`/vpn/keys/${id}/delete`); }
   syncKeys() { return this.post('/vpn/sync'); }
@@ -122,9 +125,11 @@ class ApiClient {
 
   // Broadcasts
   getBroadcasts(params) { return this.get('/broadcasts/', params); }
+  getBroadcastHistory(params) { return this.get('/broadcasts/', params); }
   getBroadcast(id) { return this.get(`/broadcasts/${id}`); }
   createBroadcast(data) { return this.post('/broadcasts/', data); }
-  sendBroadcast(id) { return this.post(`/broadcasts/${id}/send`); }
+  sendBroadcastById(id) { return this.post(`/broadcasts/${id}/send`); }
+  createAndSendBroadcast(data) { return this.post('/broadcasts/create-and-send', data); }
 
   // Promos
   getPromos() { return this.get('/promos/'); }
@@ -136,10 +141,20 @@ class ApiClient {
   // Telegram
   getBotInfo() { return this.get('/telegram/bot-info'); }
   sendTelegramMessage(chatId, text, parseMode = 'HTML') { return this.post('/telegram/send', { chat_id: chatId, text, parse_mode: parseMode }); }
+  setBotName(name, languageCode = 'ru') { return this.post('/telegram/set-name', { name, language_code: languageCode }); }
+  setBotDescription(description, shortDescription = '', languageCode = 'ru') { return this.post('/telegram/set-description', { description, short_description: shortDescription, language_code: languageCode }); }
+  setBotPhoto(file) { const fd = new FormData(); fd.append('file', file); return this.upload('/telegram/set-photo', fd); }
+  deleteBotPhoto() { return this.post('/telegram/delete-photo'); }
+  setBotCommands(commands) { return this.post('/telegram/set-commands', { commands }); }
+  getBotCommands() { return this.get('/telegram/get-commands'); }
+  getBotName(languageCode = 'ru') { return this.get('/telegram/get-name', { language_code: languageCode }); }
+  getBotDescription(languageCode = 'ru') { return this.get('/telegram/get-description', { language_code: languageCode }); }
+  refreshWebhook() { return this.post('/telegram/refresh-webhook'); }
 
   // Referrals
   getReferralStats() { return this.get('/referrals/stats'); }
-  getTopReferrers(limit) { return this.get('/referrals/top', { limit }); }
+  getReferrals(params = {}) { return this.get('/referrals/', params); }
+  getTopReferrers(limit = 20) { return this.get('/referrals/top', { limit }); }
   getUserReferrals(userId) { return this.get(`/referrals/user/${userId}`); }
 
   // Remnawave
@@ -155,13 +170,16 @@ class ApiClient {
 
   // Database
   getDatabaseStats() { return this.get('/database/stats'); }
-  exportDatabase(format = 'sql') { return this.get('/database/export', { format }); }
+  exportDatabase(format = 'sql') { return this.request('GET', '/database/export', { params: { format }, raw: true }); }
   clearDatabase() { return this.post('/database/clear'); }
 
   // Settings
   getSettings() { return this.get('/settings/'); }
   updateSettings(data) { return this.patch('/settings/', data); }
   getPaymentSystems() { return this.get('/settings/payment-systems'); }
+  getPaymentSystemsDetail() { return this.get('/settings/payment-systems/detail'); }
+  configurePaymentSystem(name, data) { return this.post(`/settings/payment-systems/${name}/configure`, data); }
+  testPaymentSystem(name) { return this.post(`/settings/payment-systems/${name}/test`); }
   getAppConfig() { return this.get('/settings/config'); }
 }
 

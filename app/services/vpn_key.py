@@ -73,6 +73,19 @@ class VpnKeyService:
     async def get_user_keys(self, user_id: int) -> list[VpnKey]:
         return await self.get_active_for_user(user_id)
 
+    async def get_all(self, limit: int = 1000, offset: int = 0) -> list[VpnKey]:
+        result = await self.session.execute(
+            select(VpnKey)
+            .options(
+                undefer(VpnKey.download),
+                undefer(VpnKey.upload),
+            )
+            .order_by(VpnKey.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+
     async def get_all_for_user(self, user_id: int) -> list[VpnKey]:
         result = await self.session.execute(
             select(VpnKey)

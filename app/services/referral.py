@@ -203,6 +203,24 @@ class ReferralService:
         await self.session.flush()
         return ref
 
+    async def get_all(self, limit: int = 500, offset: int = 0) -> list[dict]:
+        result = await self.session.execute(
+            select(Referral).order_by(Referral.id.desc()).offset(offset).limit(limit)
+        )
+        refs = result.scalars().all()
+        return [
+            {
+                "id": r.id,
+                "referrer_id": r.referrer_id,
+                "referred_id": r.referred_id,
+                "bonus_type": r.bonus_type,
+                "bonus_value": str(r.bonus_value) if r.bonus_value else None,
+                "is_paid": r.is_paid,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in refs
+        ]
+
     async def count_referrals(self, referrer_id: int) -> int:
         result = await self.session.execute(
             select(func.count())

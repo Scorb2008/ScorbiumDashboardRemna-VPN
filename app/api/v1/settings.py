@@ -1,13 +1,27 @@
 """REST API endpoints for settings and configuration."""
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
+from pydantic import BaseModel
+from typing import Optional
 
 from app.api.dependencies import get_db, get_current_admin
 from app.core.config import config
 from app.services.bot_settings import BotSettingsService
 
 router = APIRouter()
+
+
+class PaymentSystemConfig(BaseModel):
+    enabled: Optional[bool] = None
+    shop_id: Optional[str] = None
+    api_key: Optional[str] = None
+    secret: Optional[str] = None
+    secret_word_1: Optional[str] = None
+    secret_word_2: Optional[str] = None
+    token: Optional[str] = None
+    merchant_id: Optional[str] = None
+    rate: Optional[str] = None
 
 
 @router.get("/")
@@ -45,6 +59,160 @@ async def get_payment_systems(
             name = key.replace("payment_system_", "")
             systems[name] = settings[key]
     return systems
+
+
+@router.get("/payment-systems/detail")
+async def get_payment_systems_detail(
+    db: AsyncSession = Depends(get_db),
+    _admin=Depends(get_current_admin),
+):
+    svc = BotSettingsService(db)
+    settings = await svc.get_all()
+    systems = {}
+    ps_keys = {k: v for k, v in settings.items() if k.startswith("ps_")}
+    for key, val in ps_keys.items():
+        name = key.replace("ps_", "").replace("_enabled", "")
+        if name not in systems:
+            systems[name] = {"enabled": False, "config": {}}
+        if key.endswith("_enabled"):
+            systems[name]["enabled"] = val == "1"
+        else:
+            systems[name]["config"][key.replace(f"ps_{name}_", "")] = val
+
+    # Add additional config keys per payment system
+    for name in systems:
+        if name == "yookassa":
+            systems[name]["config"]["shop_id"] = settings.get("yookassa_shop_id", "")
+            systems[name]["config"]["secret_key"] = settings.get(
+                "yookassa_secret_key_override", ""
+            )
+        elif name == "cryptobot":
+            systems[name]["config"]["token"] = settings.get("cryptobot_token", "")
+            systems[name]["config"]["rate"] = settings.get("stars_rate", "1.5")
+        elif name == "freekassa":
+            systems[name]["config"]["shop_id"] = settings.get("freekassa_shop_id", "")
+            systems[name]["config"]["api_key"] = settings.get("freekassa_api_key", "")
+            systems[name]["config"]["secret_word_1"] = settings.get(
+                "freekassa_secret_word_1", ""
+            )
+            systems[name]["config"]["secret_word_2"] = settings.get(
+                "freekassa_secret_word_2", ""
+            )
+        elif name == "aikassa":
+            systems[name]["config"]["shop_id"] = settings.get("aikassa_shop_id", "")
+            systems[name]["config"]["token"] = settings.get("aikassa_token", "")
+        elif name == "platega":
+            systems[name]["config"]["merchant_id"] = settings.get(
+                "platega_merchant_id", ""
+            )
+            systems[name]["config"]["secret"] = settings.get("platega_secret", "")
+        elif name == "paypalych":
+            systems[name]["config"]["api_token"] = settings.get(
+                "paypalych_api_token", ""
+            )
+
+    return systems
+
+
+@router.post("/payment-systems/{name}/configure")
+async def configure_payment_system(
+    name: str,
+    body: PaymentSystemConfig,
+    db: AsyncSession = Depends(get_db),
+    _admin=Depends(get_current_admin),
+):
+    svc = BotSettingsService(db)
+    updates = {}
+
+    # Enable/disable
+    if body.enabled is not None:
+        updates[f"ps_{name}_enabled"] = "1" if body.enabled else "0"
+
+    # System-specific config
+    if name == "yookassa":
+        if body.shop_id is not None:
+            updates["yookassa_shop_id"] = body.shop_id
+        if body.secret is not None:
+            updates["yookassa_secret_key_override"] = body.secret
+    elif name == "cryptobot":
+        if body.token is not None:
+            updates["cryptobot_token"] = body.token
+        if body.rate is not None:
+            updates["stars_rate"] = body.rate
+    elif name == "freekassa":
+        if body.shop_id is not None:
+            updates["freekassa_shop_id"] = body.shop_id
+        if body.api_key is not None:
+            updates["freekassa_api_key"] = body.api_key
+        if body.secret_word_1 is not None:
+            updates["freekassa_secret_word_1"] = body.secret_word_1
+        if body.secret_word_2 is not None:
+            updates["freekassa_secret_word_2"] = body.secret_word_2
+    elif name == "aikassa":
+        if body.shop_id is not None:
+            updates["aikassa_shop_id"] = body.shop_id
+        if body.token is not None:
+            updates["aikassa_token"] = body.token
+    elif name == "platega":
+        if body.merchant_id is not None:
+            updates["platega_merchant_id"] = body.merchant_id
+        if body.secret is not None:
+            updates["platega_secret"] = body.secret
+    elif name == "paypalych":
+        if body.token is not None:
+            updates["paypalych_api_token"] = body.token
+    elif name == "stars":
+        if body.rate is not None:
+            updates["stars_rate"] = body.rate
+
+    if updates:
+        await svc.set_many(updates)
+        await db.commit()
+
+    return {"ok": True, **updates}
+
+
+@router.post("/payment-systems/{name}/test")
+async def test_payment_system(
+    name: str,
+    db: AsyncSession = Depends(get_db),
+    _admin=Depends(get_current_admin),
+):
+    svc = BotSettingsService(db)
+    settings = await svc.get_all()
+
+    if name == "yookassa":
+        shop_id = settings.get("yookassa_shop_id", "")
+        secret = settings.get("yookassa_secret_key_override", "")
+        if not shop_id or not secret:
+            return {"ok": False, "detail": "YooKassa не настроен: отсутствуют shop_id или secret_key"}
+        try:
+            from yookassa import Configuration
+            Configuration.account_id = shop_id
+            Configuration.secret_key = secret
+            from yookassa import Me
+            me = Me.info()
+            return {"ok": True, "detail": f"YooKassa: {me.account_id}"}
+        except Exception as e:
+            return {"ok": False, "detail": f"YooKassa: {e}"}
+    elif name == "cryptobot":
+        token = settings.get("cryptobot_token", "")
+        if not token:
+            return {"ok": False, "detail": "CryptoBot не настроен: отсутствует токен"}
+        try:
+            import httpx
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(
+                    "https://api.cryptobot.ai/api/v1/me",
+                    headers={"Crypto-Pay-API-Token": token},
+                )
+                if resp.status_code == 200:
+                    return {"ok": True, "detail": "CryptoBot: подключение успешно"}
+                return {"ok": False, "detail": f"CryptoBot: HTTP {resp.status_code}"}
+        except Exception as e:
+            return {"ok": False, "detail": f"CryptoBot: {e}"}
+    else:
+        return {"ok": True, "detail": f"{name}: проверка не реализована, сохранено"}
 
 
 @router.get("/config")

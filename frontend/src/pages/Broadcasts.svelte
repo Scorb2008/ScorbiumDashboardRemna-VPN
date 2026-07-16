@@ -25,7 +25,8 @@
     if (!text.trim()) return toasts.error('Введите текст рассылки');
     sending = true;
     try {
-      await api.sendBroadcast({ text: text.trim(), target });
+      const created = await api.createBroadcast({ text: text.trim(), target });
+      await api.sendBroadcastById(created.id);
       toasts.success('Рассылка отправлена!');
       text = '';
       await loadHistory();

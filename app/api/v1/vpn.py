@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import get_db, get_current_admin
@@ -6,6 +6,16 @@ from app.schemas.vpn import VpnKeyRead
 from app.services.vpn_key import VpnKeyService
 
 router = APIRouter()
+
+
+@router.get("/keys", response_model=list[VpnKeyRead])
+async def list_all_keys(
+    limit: int = Query(1000, ge=1, le=5000),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db),
+    _=Depends(get_current_admin),
+):
+    return await VpnKeyService(db).get_all(limit=limit, offset=offset)
 
 
 @router.get("/{user_id}/keys", response_model=list[VpnKeyRead])

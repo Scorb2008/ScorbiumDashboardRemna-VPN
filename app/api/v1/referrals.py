@@ -21,6 +21,19 @@ async def referral_top(
     return await ReferralService(db).get_top(limit=limit)
 
 
+@router.get("/")
+async def list_all_referrals(
+    limit: int = 500,
+    offset: int = 0,
+    db: AsyncSession = Depends(get_db),
+    _=Depends(get_current_admin),
+):
+    svc = ReferralService(db)
+    items = await svc.get_all(limit=limit, offset=offset)
+    stats = await svc.get_stats()
+    return {"items": items, "stats": stats, "total": len(items)}
+
+
 @router.get("/user/{user_id}")
 async def user_referrals(
     user_id: int, db: AsyncSession = Depends(get_db), _=Depends(get_current_admin)
