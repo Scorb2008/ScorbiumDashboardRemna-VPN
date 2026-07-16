@@ -24,21 +24,15 @@ async def db_stats(
     db: AsyncSession = Depends(get_db),
     _admin=Depends(get_current_admin),
 ):
-    result = await db.execute(
-        select(
-            func.count().label("users"),
-            select(func.count()).select_from(VpnKey).scalar_subquery().label("vpn_keys"),
-            select(func.count()).select_from(Payment).scalar_subquery().label("payments"),
-            select(func.count()).select_from(SupportTicket).scalar_subquery().label("tickets"),
-        )
-    )
-    row = result.one()
+    users = (await db.execute(select(func.count()).select_from(User))).scalar_one()
+    vpn_keys = (await db.execute(select(func.count()).select_from(VpnKey))).scalar_one()
+    payments = (await db.execute(select(func.count()).select_from(Payment))).scalar_one()
+    tickets = (await db.execute(select(func.count()).select_from(SupportTicket))).scalar_one()
     return {
-        "users": row.users or 0,
-        "vpn_keys": row.vpn_keys or 0,
-        "payments": row.payments or 0,
-        "tickets": row.tickets or 0,
-        "admins": 0,
+        "users": users or 0,
+        "vpn_keys": vpn_keys or 0,
+        "payments": payments or 0,
+        "tickets": tickets or 0,
     }
 
 

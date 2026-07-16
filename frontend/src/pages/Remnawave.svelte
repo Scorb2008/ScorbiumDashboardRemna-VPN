@@ -28,7 +28,7 @@
     token = data.token;
   }
 
-  async function remnawaveFetch(method, path, body) {
+  async function remnawaveFetch(method, path, body, retries = 1) {
     if (!token) await getToken();
     const res = await fetch(`${baseUrl}/${path.replace(/^\//, '')}`, {
       method,
@@ -38,12 +38,14 @@
       },
       body: body ? JSON.stringify(body) : undefined,
     });
-    if (res.status === 401) {
+    if (res.status === 401 && retries > 0) {
       token = '';
-      const data = await api.getRemnawaveConnect();
-      baseUrl = data.base_url;
-      token = data.token;
-      return remnawaveFetch(method, path, body);
+      await getToken();
+      return remnawaveFetch(method, path, body, retries - 1);
+    }
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`Remnawave ${res.status}: ${text.slice(0, 200)}`);
     }
     if (res.status === 204) return null;
     return res.json();
