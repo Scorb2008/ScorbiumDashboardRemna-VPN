@@ -27,12 +27,16 @@
   let sidebarOpen = $state(true);
   let isMobile = $state(false);
 
+  const SIDEBAR_W = 260;
+
   onMount(() => {
     const saved = localStorage.getItem('sidebar_open');
     if (saved !== null) sidebarOpen = saved === 'true';
 
     function checkMobile() {
+      const wasMobile = isMobile;
       isMobile = window.innerWidth < 768;
+      if (!wasMobile && isMobile) sidebarOpen = false;
     }
     checkMobile();
     window.addEventListener('resize', checkMobile);
@@ -67,27 +71,33 @@
   <div class="flex h-screen overflow-hidden bg-bg">
     <!-- Mobile overlay backdrop -->
     {#if sidebarOpen && isMobile}
-      <div
-        class="fixed inset-0 bg-black/60 z-20 md:hidden"
-        onclick={closeSidebar}
-      ></div>
+      <button class="fixed inset-0 bg-black/60 z-20 md:hidden border-0 cursor-default" onclick={closeSidebar} aria-label="Close sidebar"></button>
     {/if}
 
     <!-- Sidebar -->
-    <aside
-      class="fixed md:relative z-30 h-full transition-all duration-300 ease-in-out overflow-hidden
-        {sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-        md:translate-x-0"
-      class:w-[260px]={sidebarOpen}
-    >
-      <div class="w-[260px] h-full border-r border-[#2a2a35] bg-bg shrink-0">
+    {#if isMobile}
+      <!-- Mobile: absolute overlay sidebar -->
+      <div
+        class="fixed z-30 h-full w-[260px] border-r border-[#2a2a35] bg-bg transition-transform duration-300 ease-in-out"
+        style="transform: translateX({sidebarOpen ? '0' : '-100%'});"
+      >
         <Sidebar bind:currentPath />
       </div>
-    </aside>
+    {:else}
+      <!-- Desktop: fixed sidebar that slides -->
+      <div
+        class="fixed md:relative z-30 h-full border-r border-[#2a2a35] bg-bg transition-all duration-300 ease-in-out overflow-hidden"
+        style="width: {sidebarOpen ? SIDEBAR_W + 'px' : '0px'};"
+      >
+        <div class="w-[260px] h-full">
+          <Sidebar bind:currentPath />
+        </div>
+      </div>
+    {/if}
 
     <!-- Main content -->
     <div class="flex-1 flex flex-col min-w-0">
-      <!-- Top bar with hamburger -->
+      <!-- Top bar with hamburger (mobile only) -->
       <header class="flex items-center gap-3 px-4 py-3 border-b border-[#2a2a35] bg-bg/80 backdrop-blur-sm md:hidden sticky top-0 z-10">
         <button onclick={toggleSidebar} class="p-1.5 rounded-lg text-muted hover:text-text hover:bg-surface-2 transition-colors">
           <Icon name={sidebarOpen ? 'x' : 'menu'} size={22} />
@@ -100,19 +110,19 @@
         </div>
       </header>
 
-      <!-- Desktop sidebar toggle -->
-      <button
-        onclick={toggleSidebar}
-        class="hidden md:flex fixed top-1/2 -translate-y-1/2 z-40 w-5 h-10 items-center justify-center rounded-r-lg bg-surface-2 border border-l-0 border-[#2a2a35] text-muted hover:text-text transition-all duration-300 ease-in-out cursor-pointer"
-        style="left: {sidebarOpen ? '260px' : '0px'};"
-      >
-        <Icon name={sidebarOpen ? 'chevronLeft' : 'chevronRight'} size={14} />
-      </button>
+      <!-- Desktop sidebar toggle button -->
+      {#if !isMobile}
+        <button
+          onclick={toggleSidebar}
+          class="fixed top-1/2 -translate-y-1/2 z-40 w-5 h-10 items-center justify-center rounded-r-lg bg-surface-2 border border-l-0 border-[#2a2a35] text-muted hover:text-text transition-all duration-300 ease-in-out cursor-pointer hidden md:flex"
+          style="left: {sidebarOpen ? SIDEBAR_W + 'px' : '0px'};"
+          aria-label={sidebarOpen ? 'Скрыть сайдбар' : 'Показать сайдбар'}
+        >
+          <Icon name={sidebarOpen ? 'chevronLeft' : 'chevronRight'} size={14} />
+        </button>
+      {/if}
 
-      <main
-        class="flex-1 overflow-y-auto"
-        style="transition: margin-left 0.3s ease-in-out;"
-      >
+      <main class="flex-1 overflow-y-auto">
         <div class="p-4 md:p-6 max-w-[1600px] min-h-screen">
           {#if currentPath === '/dashboard'}
             <Dashboard />

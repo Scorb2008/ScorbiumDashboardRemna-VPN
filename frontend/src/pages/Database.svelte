@@ -139,7 +139,7 @@
 </div>
 
 <ConfirmDialog
-  bind:open={confirmClear}
+  bind:show={confirmClear}
   title="Очистить базу данных?"
   message="Это удалит ВСЕХ пользователей, Подписки, платежи, тикеты и реферальные связи. Администраторы и настройки сохраняются."
   confirmText="Очистить всё"

@@ -50,7 +50,9 @@ class RemnawaveClient:
 
             if self._api_key:
                 self._token = self._api_key
-                self._token_expires = now + timedelta(days=365)
+                RemnawaveClient._token = self._token
+                RemnawaveClient._token_expires = now + timedelta(days=365)
+                self._token_expires = RemnawaveClient._token_expires
                 return self._token
 
             if not self._login or not self._password:
@@ -70,7 +72,9 @@ class RemnawaveClient:
             data = resp.json()
             response = data.get("response", data)
             self._token = response["accessToken"]
-            self._token_expires = now + timedelta(hours=23)
+            RemnawaveClient._token = self._token
+            RemnawaveClient._token_expires = now + timedelta(hours=23)
+            self._token_expires = RemnawaveClient._token_expires
             log.info("Remnawave token refreshed")
             return self._token
 
@@ -202,7 +206,7 @@ class RemnawaveService(VpnPanelInterface):
         memory = data.get("memory", {})
         result["mem_used"] = memory.get("used", 0)
         cpu = data.get("cpu", {})
-        result["cpu_usage"] = cpu.get("cores", 0)
+        result["cpu_usage"] = cpu.get("load", 0) or cpu.get("cores", 0)
         result["nodes_online"] = nodes.get("totalOnline", 0)
         return result
 

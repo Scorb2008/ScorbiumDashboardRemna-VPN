@@ -140,6 +140,7 @@ class ApiClient {
   // Promos
   getPromos() { return this.get('/promos/'); }
   createPromo(data) { return this.post('/promos/', data); }
+  updatePromo(id, data) { return this.patch(`/promos/${id}`, data); }
   deletePromo(id) { return this.del(`/promos/${id}`); }
   togglePromo(id) { return this.post(`/promos/${id}/toggle`); }
   applyPromo(code, userId) { return this.post('/promos/apply', { code, user_id: userId }); }

@@ -208,7 +208,7 @@
 </Modal>
 
 <ConfirmDialog
-  bind:open={confirmDelete}
+  bind:show={confirmDelete}
   title="Удалить администратора?"
   message={`Удалить ${deleteTarget?.username}? Это действие необратимо.`}
   confirmText="Удалить" danger

@@ -129,4 +129,4 @@
   </form>
 </Modal>
 
-<ConfirmDialog bind:open={confirmDelete} title="Удалить тариф?" message={`Удалить тариф «${deleteTarget?.name}»?`} confirmText="Удалить" danger onConfirm={doDelete} />
+<ConfirmDialog bind:show={confirmDelete} title="Удалить тариф?" message={`Удалить тариф «${deleteTarget?.name}»?`} confirmText="Удалить" danger onConfirm={doDelete} />

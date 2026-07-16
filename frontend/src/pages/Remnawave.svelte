@@ -7,7 +7,6 @@
   import Icon from '../components/Icon.svelte';
 
   let baseUrl = $state('');
-  let token = $state('');
   let status = $state(null);
   let nodes = $state([]);
   let remnawaveUsers = $state([]);
@@ -22,45 +21,28 @@
   let proxyError = $state('');
   let proxyHistory = $state([]);
 
-  async function getToken() {
-    const data = await api.getRemnawaveConnect();
-    baseUrl = data.base_url;
-    token = data.token;
-  }
-
-  async function remnawaveFetch(method, path, body, retries = 1) {
-    if (!token) await getToken();
-    const res = await fetch(`${baseUrl}/${path.replace(/^\//, '')}`, {
-      method,
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: body ? JSON.stringify(body) : undefined,
-    });
-    if (res.status === 401 && retries > 0) {
-      token = '';
-      await getToken();
-      return remnawaveFetch(method, path, body, retries - 1);
+  async function remnawaveProxy(method, path, body) {
+    const queryPath = path.replace(/^\//, '');
+    const opts = {};
+    if (method !== 'GET' && body) {
+      opts.body = body;
     }
-    if (!res.ok) {
-      const text = await res.text().catch(() => '');
-      throw new Error(`Remnawave ${res.status}: ${text.slice(0, 200)}`);
-    }
-    if (res.status === 204) return null;
-    return res.json();
+    const res = await api.request(method, `/remnawave/proxy/${queryPath}`, opts);
+    return res;
   }
 
   async function loadAll() {
     loading = true;
     try {
-      await getToken();
+      const connectData = await api.getRemnawaveConnect();
+      baseUrl = connectData.base_url || '';
+
       const [s, n, u] = await Promise.all([
-        remnawaveFetch('GET', 'api/system/stats').catch(() => null),
-        remnawaveFetch('GET', 'api/nodes').then(d => d?.nodes || []).catch(() => []),
-        remnawaveFetch('GET', 'api/users?start=0&size=100').then(d => d?.users || []).catch(() => []),
+        remnawaveProxy('GET', 'api/system/stats').catch(() => null),
+        remnawaveProxy('GET', 'api/nodes').then(d => d?.nodes || d?.response?.nodes || []).catch(() => []),
+        remnawaveProxy('GET', 'api/users?start=0&size=100').then(d => d?.users || d?.response?.users || []).catch(() => []),
       ]);
-      status = s ? { connected: true, stats: s } : { connected: false };
+      status = s ? { connected: true, stats: s.response || s } : { connected: false };
       nodes = n;
       remnawaveUsers = u;
     } catch (e) {
@@ -79,9 +61,9 @@
     proxyError = '';
     proxyResponse = null;
     try {
-      const body = (proxyMethod === 'POST' || proxyMethod === 'PUT' || proxyMethod === 'PATCH') && proxyBody.trim()
+      const body = (proxyMethod !== 'GET') && proxyBody.trim()
         ? JSON.parse(proxyBody.trim()) : undefined;
-      const res = await remnawaveFetch(proxyMethod, proxyPath.trim(), body);
+      const res = await remnawaveProxy(proxyMethod, proxyPath.trim(), body);
       proxyResponse = res;
       proxyHistory = [{ method: proxyMethod, path: proxyPath.trim(), time: new Date().toLocaleTimeString('ru-RU') }, ...proxyHistory].slice(0, 20);
     } catch (e) {
@@ -158,7 +140,7 @@
   <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
     <div>
       <h1 class="text-[28px] font-bold tracking-tight text-text">Remnawave</h1>
-      <p class="text-sm text-muted mt-1">Прямое подключение к API Remnawave</p>
+      <p class="text-sm text-muted mt-1">Управление VPN панелью Remnawave</p>
     </div>
     <button class="btn btn-secondary" onclick={loadAll} disabled={loading}>
       <Icon name="refresh-cw" class="w-4 h-4" />
@@ -169,7 +151,7 @@
   {#if baseUrl}
     <div class="card p-3 flex items-center gap-2.5 text-xs text-muted">
       <Icon name="link" class="w-3.5 h-3.5" />
-      Подключено к: <code class="font-mono text-accent">{baseUrl}</code>
+      Панель: <code class="font-mono text-accent">{baseUrl}</code>
       <span class="w-1.5 h-1.5 rounded-full bg-success ml-1"></span>
     </div>
   {/if}
@@ -256,7 +238,7 @@
 
     <div class="flex gap-1 bg-surface-2 p-1 rounded-[10px] w-fit">
       {#each [
-        { id: 'overview', label: 'Обзор', icon: 'bar-chart-3' },
+        { id: 'overview', label: 'Обзор', icon: 'barChart3' },
         { id: 'nodes', label: 'Узлы', icon: 'server' },
         { id: 'users', label: 'Пользователи', icon: 'users' },
         { id: 'api', label: 'Full API', icon: 'terminal' },
@@ -305,8 +287,8 @@
       <div class="space-y-4">
         <div class="card p-5">
           <div class="flex items-center justify-between mb-4">
-            <h3 class="text-[15px] font-semibold">Прямой вызов API Remnawave</h3>
-            <p class="text-[11px] text-muted">Использует токен из /api/v1/remnawave/connect</p>
+            <h3 class="text-[15px] font-semibold">API Remnawave (прокси)</h3>
+            <p class="text-[11px] text-muted">Запросы проходят через бэкенд</p>
           </div>
           <div class="flex gap-2 mb-3">
             <select bind:value={proxyMethod} class="select w-24 text-xs font-mono">
@@ -369,26 +351,15 @@
 
         <div class="card p-5">
           <h3 class="text-[15px] font-semibold mb-3">Доступные эндпоинты Remnawave</h3>
-          <p class="text-[13px] text-muted mb-3">Все эндпоинты Remnawave API доступны напрямую через браузер. Примеры:</p>
           <div class="space-y-1.5 text-[12px] font-mono">
             {#each [
               { method: 'GET', path: 'api/system/stats', desc: 'Статистика системы' },
-              { method: 'GET', path: 'api/system/health', desc: 'Health check' },
               { method: 'GET', path: 'api/nodes', desc: 'Список узлов' },
               { method: 'GET', path: 'api/users?start=0&size=50', desc: 'Список пользователей' },
               { method: 'GET', path: 'api/users/by-username/{username}', desc: 'Поиск пользователя' },
               { method: 'POST', path: 'api/users', desc: 'Создать пользователя' },
-              { method: 'PATCH', path: 'api/users/{uuid}', desc: 'Изменить пользователя' },
               { method: 'POST', path: 'api/users/{uuid}/actions/revoke', desc: 'Отозвать ключ' },
               { method: 'POST', path: 'api/users/{uuid}/actions/reset-traffic', desc: 'Сбросить трафик' },
-              { method: 'GET', path: 'api/hosts', desc: 'Список хостов' },
-              { method: 'GET', path: 'api/subscription-settings', desc: 'Настройки подписок' },
-              { method: 'GET', path: 'api/config-profiles', desc: 'Профили конфигурации' },
-              { method: 'GET', path: 'api/snippets', desc: 'Сниппеты' },
-              { method: 'GET', path: 'api/internal-squads', desc: 'Внутренние группы' },
-              { method: 'GET', path: 'api/external-squads', desc: 'Внешние группы' },
-              { method: 'GET', path: 'api/remnawave-settings', desc: 'Настройки Remnawave' },
-              { method: 'GET', path: 'api/system/stats/bandwidth', desc: 'Статистика трафика' },
             ] as ep}
               <button class="w-full flex items-center gap-2.5 py-1.5 px-2.5 rounded-[7px] hover:bg-surface-2 transition-colors" onclick={() => { proxyMethod = ep.method; proxyPath = ep.path; proxyBody = ''; activeTab = 'api'; }}>
                 <span class="font-bold text-[11px] text-accent min-w-[4ch]">{ep.method}</span>
@@ -403,12 +374,12 @@
   {:else if !loading}
     <div class="card p-12 flex flex-col items-center gap-3 text-center">
       <div class="w-14 h-14 rounded-[12px] bg-danger/10 flex items-center justify-center">
-        <Icon name="wifi-off" class="w-7 h-7 text-danger" />
+        <Icon name="wifiOff" class="w-7 h-7 text-danger" />
       </div>
       <p class="text-[17px] font-semibold">Не удалось подключиться к Remnawave</p>
-      <p class="text-[13px] text-muted max-w-md">Проверьте настройки в .env (REMNAWAVE_ADMIN_PANEL + REMNAWAVE_ADMIN_TOKEN или REMNAWAVE_ADMIN_LOGIN/PASSWORD)</p>
+      <p class="text-[13px] text-muted max-w-md">Проверьте настройки в .env (REMNAWAVE_URL_PANEL + REMNAWAVE_ADMIN_TOKEN)</p>
       <button class="btn btn-primary mt-2" onclick={loadAll}>
-        <Icon name="refresh-cw" class="w-4 h-4" />
+        <Icon name="refreshCw" class="w-4 h-4" />
         Повторить
       </button>
     </div>

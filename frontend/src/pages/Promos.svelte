@@ -147,4 +147,4 @@
   </form>
 </Modal>
 
-<ConfirmDialog bind:open={confirmDelete} title="Удалить промокод?" message={`Удалить «${deleteTarget?.code}»?`} confirmText="Удалить" danger onConfirm={doDelete} />
+<ConfirmDialog bind:show={confirmDelete} title="Удалить промокод?" message={`Удалить «${deleteTarget?.code}»?`} confirmText="Удалить" danger onConfirm={doDelete} />

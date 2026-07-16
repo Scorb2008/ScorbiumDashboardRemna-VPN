@@ -61,3 +61,20 @@ async def send_broadcast(
             detail="Broadcast not found or already sent",
         )
     return bc
+
+
+@router.post(
+    "/create-and-send",
+    response_model=BroadcastRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create and immediately send a broadcast",
+)
+async def create_and_send_broadcast(
+    data: BroadcastCreate,
+    db: AsyncSession = Depends(get_db),
+    _: str = Depends(get_current_admin),
+) -> BroadcastRead:
+    svc = BroadcastService(db)
+    bc = await svc.create(**data.model_dump())
+    sent = await svc.send(bc.id)
+    return sent

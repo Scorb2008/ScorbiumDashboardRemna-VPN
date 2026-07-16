@@ -1,8 +1,8 @@
-"""Remnawave API connectivity for the SPA frontend.
+"""Remnawave API proxy for the SPA frontend.
 
-Returns connection info so the frontend can call Remnawave API directly."""
+All Remnawave calls are proxied through the backend to avoid CORS issues."""
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from app.api.dependencies import get_current_admin
 from app.services.remnawave.remnawave_api import RemnawaveClient
 from app.core.config import config
@@ -13,14 +13,9 @@ router = APIRouter()
 
 @router.get("/connect")
 async def remnawave_connect(_admin=Depends(get_current_admin)):
-    """Return Remnawave base URL + auth token for direct API calls from frontend."""
-    try:
-        client = RemnawaveClient()
-        token = await client._get_token()
-        base = str(config.remnawave.remnawave_admin_panel).rstrip("/")
-        return {"base_url": base, "token": token}
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Remnawave auth failed: {str(e)}")
+    """Return Remnawave base URL for display purposes."""
+    base = str(config.remnawave.remnawave_admin_panel).rstrip("/")
+    return {"base_url": base}
 
 
 @router.get("/status")
@@ -28,13 +23,37 @@ async def remnawave_status(_admin=Depends(get_current_admin)):
     """Quick health check — proxies a single request to /api/system/stats."""
     try:
         client = RemnawaveClient()
-        from httpx import AsyncClient
-        headers = await client._headers()
-        base = str(config.remnawave.remnawave_admin_panel).rstrip("/")
-        async with AsyncClient(timeout=15) as session:
-            resp = await session.get(f"{base}/api/system/stats", headers=headers)
-            if resp.status_code == 200:
-                return {"connected": True, "stats": resp.json()}
-            return {"connected": False, "error": f"HTTP {resp.status_code}"}
+        data = await client.get("/api/system/stats")
+        return {"connected": True, "stats": data}
     except Exception as e:
         return {"connected": False, "error": str(e)}
+
+
+@router.api_route(
+    "/proxy/{path:path}",
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+    summary="Proxy arbitrary requests to Remnawave API",
+)
+async def remnawave_proxy(
+    path: str,
+    request: Request,
+    _admin=Depends(get_current_admin),
+):
+    """Proxy any request to the Remnawave API panel.
+    This avoids CORS issues by routing through the backend."""
+    try:
+        client = RemnawaveClient()
+        method = request.method.lower()
+        body = None
+        if method in ("post", "put", "patch"):
+            body = await request.json()
+        params = dict(request.query_params) or None
+        result = await client._request(
+            method.upper(),
+            f"/api/{path}",
+            json=body,
+            params=params,
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Remnawave error: {str(e)}")
