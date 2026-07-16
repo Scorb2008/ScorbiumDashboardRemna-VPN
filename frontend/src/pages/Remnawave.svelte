@@ -236,7 +236,7 @@
       </div>
     {/if}
 
-    <div class="flex gap-1 bg-surface-2 p-1 rounded-[10px] w-fit">
+    <div class="flex gap-1 bg-surface-2 p-1 rounded-[10px] w-fit overflow-x-auto whitespace-nowrap">
       {#each [
         { id: 'overview', label: 'Обзор', icon: 'barChart3' },
         { id: 'nodes', label: 'Узлы', icon: 'server' },
@@ -290,15 +290,17 @@
             <h3 class="text-[15px] font-semibold">API Remnawave (прокси)</h3>
             <p class="text-[11px] text-muted">Запросы проходят через бэкенд</p>
           </div>
-          <div class="flex gap-2 mb-3">
-            <select bind:value={proxyMethod} class="select w-24 text-xs font-mono">
-              <option>GET</option>
-              <option>POST</option>
-              <option>PUT</option>
-              <option>PATCH</option>
-              <option>DELETE</option>
-            </select>
-            <input type="text" bind:value={proxyPath} class="input flex-1 font-mono text-xs" placeholder="api/system/stats" />
+          <div class="flex flex-col sm:flex-row gap-2 mb-3">
+            <div class="flex gap-2">
+              <select bind:value={proxyMethod} class="select w-24 text-xs font-mono">
+                <option>GET</option>
+                <option>POST</option>
+                <option>PUT</option>
+                <option>PATCH</option>
+                <option>DELETE</option>
+              </select>
+              <input type="text" bind:value={proxyPath} class="input flex-1 font-mono text-xs" placeholder="api/system/stats" />
+            </div>
             <button class="btn btn-primary" onclick={callDirect} disabled={proxyLoading || !proxyPath.trim()}>
               {#if proxyLoading}
                 <div class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>

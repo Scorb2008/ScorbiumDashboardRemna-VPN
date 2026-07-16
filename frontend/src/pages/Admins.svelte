@@ -123,7 +123,7 @@
 <Spinner {loading} />
 
 <div class="page-enter space-y-5">
-  <div class="flex items-center justify-between">
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
     <div>
       <h1 class="text-[28px] font-bold tracking-tight text-text">Администраторы</h1>
       <p class="text-sm text-muted mt-1">{admins.length} администраторов</p>

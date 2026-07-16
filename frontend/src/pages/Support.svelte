@@ -216,9 +216,9 @@
 
 <Spinner {loading} />
 
-<div class="page-enter flex gap-4 h-[calc(100vh-7rem)]">
+<div class="page-enter flex flex-col lg:flex-row gap-4 h-auto lg:h-[calc(100vh-7rem)]">
   <!-- Left: Chat Panel -->
-  <div class="flex-[2] min-w-0 flex flex-col bg-[#16161d] rounded-[14px] border border-zinc-800/50 overflow-hidden">
+  <div class="flex-[2] min-w-0 flex flex-col bg-[#16161d] rounded-[14px] border border-zinc-800/50 overflow-hidden {activeTicketId ? 'min-h-[60vh] lg:min-h-0' : 'min-h-[40vh] lg:min-h-0'}">
     {#if activeTicketId && selectedTicket}
       <!-- Chat Header -->
       <div class="flex items-center gap-3 px-5 py-3.5 border-b border-zinc-800/50 bg-[#0d0d12]/50 shrink-0">
@@ -333,14 +333,14 @@
         </div>
         <div class="text-center">
           <p class="text-[17px] font-medium text-zinc-400">Выберите тикет</p>
-          <p class="text-[13px] text-zinc-600 mt-1">Выберите обращение из списка справа</p>
+          <p class="text-[13px] text-zinc-600 mt-1">Выберите обращение из списка</p>
         </div>
       </div>
     {/if}
   </div>
 
   <!-- Right: Ticket List Panel -->
-  <div class="flex-1 min-w-[300px] flex flex-col bg-[#16161d] rounded-[14px] border border-zinc-800/50 overflow-hidden">
+  <div class="flex-1 flex flex-col bg-[#16161d] rounded-[14px] border border-zinc-800/50 overflow-hidden {activeTicketId ? 'max-h-[40vh] lg:max-h-none' : ''}">
     <!-- Panel Header -->
     <div class="px-4 py-3.5 border-b border-zinc-800/50 shrink-0 space-y-3">
       <div class="flex items-center justify-between gap-2">

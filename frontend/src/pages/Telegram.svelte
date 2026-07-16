@@ -23,8 +23,42 @@
   let logoUploading = $state(false);
   let sectionUploading = $state('');
 
-  let dragIndex = $state(null);
-  let dragOverIndex = $state(null);
+  let dragSource = $state(null);
+  let dragOverTarget = $state(null);
+
+  function parseLayout(raw) {
+    if (raw && typeof raw === 'string' && raw.trim()) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.every(r => Array.isArray(r))) {
+          return parsed.map(row => row.filter(name => typeof name === 'string'));
+        }
+      } catch {}
+      return raw.split(',').map(s => s.trim()).filter(Boolean).map(name => [name]);
+    }
+    return [];
+  }
+
+  let buttonLayout = $state([[]]);
+  let allEnabledButtons = $derived(
+    BUTTON_PRESETS.filter(b => settings[`btn_${b.name}`]?.trim())
+  );
+  let unassignedButtons = $derived(
+    allEnabledButtons.filter(b => !buttonLayout.flat().includes(b.name))
+  );
+  let layoutFlat = $derived(buttonLayout.flat());
+
+  function refreshLayout() {
+    const raw = settings['btn_order'];
+    const parsed = parseLayout(raw);
+    if (parsed.length > 0) {
+      buttonLayout = parsed;
+    } else {
+      buttonLayout = allEnabledButtons.map(b => [b.name]);
+    }
+  }
+
+  $effect(() => { settings; refreshLayout(); });
 
   const ALL_ICONS = [
     'dashboard', 'users', 'key', 'creditCard', 'payment', 'server', 'lifeBuoy',
@@ -93,34 +127,6 @@
     'photo_welcome', 'photo_buy', 'photo_my_keys', 'photo_balance',
     'photo_about', 'photo_support', 'photo_profile', 'photo_language', 'photo_trial',
   ];
-
-  let activeButtons = $derived.by(() => {
-    const orderRaw = settings['btn_order'];
-    let names;
-    if (orderRaw && typeof orderRaw === 'string' && orderRaw.trim()) {
-      names = orderRaw.split(',').map(s => s.trim()).filter(Boolean);
-    } else {
-      names = BUTTON_PRESETS.map(b => b.name);
-    }
-    const result = [];
-    const seen = new Set();
-    for (const name of names) {
-      const preset = BUTTON_PRESETS.find(b => b.name === name);
-      if (preset && settings[`btn_${preset.name}`]?.trim() && !seen.has(name)) {
-        result.push(preset);
-        seen.add(name);
-      }
-    }
-    for (const b of BUTTON_PRESETS) {
-      if (settings[`btn_${b.name}`]?.trim() && !seen.has(b.name)) {
-        result.push(b);
-        seen.add(b.name);
-      }
-    }
-    return result;
-  });
-
-  let buttonOrder = $derived(activeButtons.map(b => b.name));
 
   let currentEdit = $derived(editingBtn ? BUTTON_PRESETS.find(b => b.name === editingBtn) : null);
 
@@ -234,6 +240,13 @@
     settings[`btn_${preset.name}`] = preset.label;
     settings[`btn_${preset.name}_style`] = 'primary';
     settings[`btn_icon_${preset.name}`] = preset.defaultIcon;
+    const newLayout = buttonLayout.map(r => [...r]);
+    if (newLayout.length === 0 || newLayout[newLayout.length - 1].length >= 2) {
+      newLayout.push([preset.name]);
+    } else {
+      newLayout[newLayout.length - 1].push(preset.name);
+    }
+    buttonLayout = newLayout;
     editingBtn = preset.name;
     addPreset = '';
     toasts.success(`Кнопка «${preset.label}» добавлена`);
@@ -335,44 +348,99 @@
     });
   }
 
-  function handleDragStart(e, index) {
-    dragIndex = index;
+  function handleLayoutDragStart(e, rowIdx, colIdx) {
+    dragSource = { row: rowIdx, col: colIdx };
     e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', index);
+    e.dataTransfer.setData('text/plain', `${rowIdx},${colIdx}`);
   }
 
-  function handleDragOver(e, index) {
+  function handleLayoutDragOver(e, rowIdx, colIdx) {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    dragOverIndex = index;
+    dragOverTarget = { row: rowIdx, col: colIdx };
   }
 
-  function handleDrop(e, index) {
+  function handleLayoutDragOverRow(e, rowIdx) {
     e.preventDefault();
-    if (dragIndex === null || dragIndex === index) {
-      dragIndex = null;
-      dragOverIndex = null;
-      return;
+    e.dataTransfer.dropEffect = 'move';
+    dragOverTarget = { row: rowIdx, col: -1 };
+  }
+
+  function handleLayoutDrop(e, rowIdx, colIdx) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!dragSource) { dragSource = null; dragOverTarget = null; return; }
+    const src = dragSource;
+    const name = buttonLayout[src.row]?.[src.col];
+    if (!name) { dragSource = null; dragOverTarget = null; return; }
+    const newLayout = buttonLayout.map(r => [...r]);
+    newLayout[src.row].splice(src.col, 1);
+    if (newLayout[src.row].length === 0) newLayout.splice(src.row, 1);
+    const insertRow = Math.min(rowIdx, newLayout.length);
+    if (colIdx >= 0) {
+      const insertCol = Math.min(colIdx, newLayout[insertRow]?.length ?? 0);
+      if (!newLayout[insertRow]) newLayout[insertRow] = [];
+      newLayout[insertRow].splice(insertCol, 0, name);
+    } else {
+      if (!newLayout[insertRow]) newLayout[insertRow] = [];
+      newLayout[insertRow].push(name);
     }
-    const ordered = [...buttonOrder];
-    const [moved] = ordered.splice(dragIndex, 1);
-    ordered.splice(index, 0, moved);
-    settings['btn_order'] = ordered.join(',');
-    dragIndex = null;
-    dragOverIndex = null;
+    buttonLayout = newLayout.filter(r => r.length > 0);
+    dragSource = null;
+    dragOverTarget = null;
+  }
+
+  function handlePoolDrop(e) {
+    e.preventDefault();
+    if (!dragSource) { dragSource = null; dragOverTarget = null; return; }
+    const src = dragSource;
+    const name = buttonLayout[src.row]?.[src.col];
+    if (!name) { dragSource = null; dragOverTarget = null; return; }
+    const newLayout = buttonLayout.map(r => [...r]);
+    newLayout[src.row].splice(src.col, 1);
+    buttonLayout = newLayout.filter(r => r.length > 0);
+    dragSource = null;
+    dragOverTarget = null;
   }
 
   function handleDragEnd() {
-    dragIndex = null;
-    dragOverIndex = null;
+    dragSource = null;
+    dragOverTarget = null;
+  }
+
+  function addRow() {
+    buttonLayout = [...buttonLayout, []];
+  }
+
+  function removeRow(rowIdx) {
+    const newLayout = buttonLayout.filter((_, i) => i !== rowIdx);
+    buttonLayout = newLayout.length > 0 ? newLayout : [[]];
+  }
+
+  function addBtnToRow(btnName, rowIdx) {
+    const newLayout = buttonLayout.map(r => [...r]);
+    if (rowIdx >= 0 && rowIdx < newLayout.length) {
+      newLayout[rowIdx].push(btnName);
+    } else {
+      newLayout.push([btnName]);
+    }
+    buttonLayout = newLayout;
+  }
+
+  function removeBtnFromRow(rowIdx, colIdx) {
+    const newLayout = buttonLayout.map(r => [...r]);
+    newLayout[rowIdx].splice(colIdx, 1);
+    buttonLayout = newLayout.filter(r => r.length > 0);
+    if (buttonLayout.length === 0) buttonLayout = [[]];
   }
 
   async function saveButtonOrder() {
     savingOrder = true;
     try {
-      await api.updateSettings({ btn_order: buttonOrder.join(',') });
+      const cleaned = buttonLayout.filter(r => r.length > 0);
+      await api.updateSettings({ btn_order: JSON.stringify(cleaned) });
       await reloadSettings();
-      toasts.success('Порядок кнопок сохранён');
+      toasts.success('Раскладка сохранена');
     } catch (e) { toasts.error(e.message); }
     finally { savingOrder = false; }
   }
@@ -503,11 +571,18 @@
     <div class="grid grid-cols-1 lg:grid-cols-5 gap-5">
       <div class="lg:col-span-3 space-y-4">
         <div class="card p-5 space-y-4">
-          <h3 class="text-[15px] font-semibold flex items-center gap-2"><Icon name="layoutDashboard" class="w-4 h-4 text-accent" /> Чат-превью</h3>
-          <p class="text-[13px] text-muted">Как ваши кнопки выглядят в Telegram</p>
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-[15px] font-semibold flex items-center gap-2"><Icon name="layoutDashboard" class="w-4 h-4 text-accent" /> Чат-превью</h3>
+              <p class="text-[13px] text-muted mt-0.5">Перетаскивайте кнопки прямо в превью. Каждая строка — один ряд в Telegram.</p>
+            </div>
+            <button onclick={saveButtonOrder} disabled={savingOrder} class="btn btn-primary btn-xs">
+              {savingOrder ? '...' : 'Сохранить раскладку'}
+            </button>
+          </div>
 
           <div class="flex justify-center">
-            <div class="bg-[#0f0f0f] rounded-[36px] p-3 shadow-xl border border-surface-4/30 w-[375px] max-w-full">
+            <div class="bg-[#0f0f0f] rounded-[36px] p-3 shadow-xl border border-surface-4/30 w-full max-w-[375px]">
               <div class="bg-[#17212b] rounded-[28px] overflow-hidden">
                 <div class="flex items-center justify-center h-6 bg-[#0f0f0f]">
                   <div class="w-[120px] h-[5px] bg-surface-4/50 rounded-full"></div>
@@ -520,31 +595,47 @@
                   <div class="flex-1"></div>
                   <div class="text-white/40 text-[10px]">{new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</div>
                 </div>
-                <div class="px-3 py-2 min-h-[240px] flex flex-col">
+                <div class="px-3 py-2 min-h-[280px] flex flex-col">
                   <div class="bg-[#2b5278] text-white/90 rounded-[12px] px-3 py-2 text-[13px] max-w-[80%] self-start shadow-sm leading-relaxed">
                     Выберите действие:
                   </div>
-                  {#if activeButtons.length > 0}
-                    <div class="flex flex-wrap justify-center gap-1.5 mt-2">
-                      {#each activeButtons as btn}
-                        {@const style = settings[`btn_${btn.name}_style`] || ''}
-                        {@const icon = settings[`btn_icon_${btn.name}`] || ''}
-                        <button
-                          onclick={() => selectButton(btn.name)}
-                          class="flex items-center gap-1.5 px-3 py-2 rounded-[10px] text-[12px] font-medium transition-all
-                            {!style ? 'bg-white/10 text-white/80' : style === 'primary' ? 'bg-accent/85 text-white' : style === 'success' ? 'bg-[#22c55e]/70 text-white' : 'bg-[#ef4450]/70 text-white'}">
-                          {#if icon}
-                            <Icon name={icon} class="w-3.5 h-3.5 shrink-0" />
-                          {/if}
-                          <span class="truncate max-w-[80px]">{settings[`btn_${btn.name}`]}</span>
-                        </button>
+
+                  {#if buttonLayout.length > 0 && layoutFlat.length > 0}
+                    <div class="mt-2 space-y-1.5">
+                      {#each buttonLayout as row, rowIdx (rowIdx)}
+                        <div
+                          class="flex flex-wrap justify-center gap-1 min-h-[32px] py-0.5 rounded-lg transition-all
+                            {dragOverTarget?.row === rowIdx ? 'bg-white/5 ring-1 ring-accent/40' : ''}"
+                          ondragover={(e) => handleLayoutDragOverRow(e, rowIdx)}
+                          ondrop={(e) => handleLayoutDrop(e, rowIdx, -1)}>
+                          {#each row as btnName, colIdx (rowIdx + '-' + btnName)}
+                            {@const style = settings[`btn_${btnName}_style`] || ''}
+                            {@const icon = settings[`btn_icon_${btnName}`] || ''}
+                            <div
+                              draggable="true"
+                              ondragstart={(e) => handleLayoutDragStart(e, rowIdx, colIdx)}
+                              ondragover={(e) => handleLayoutDragOver(e, rowIdx, colIdx)}
+                              ondrop={(e) => handleLayoutDrop(e, rowIdx, colIdx)}
+                              ondragend={handleDragEnd}
+                              class="flex items-center gap-1 px-2.5 py-1.5 rounded-[8px] text-[11px] font-medium cursor-grab active:cursor-grabbing select-none transition-all
+                                {!style ? 'bg-white/10 text-white/80' : style === 'primary' ? 'bg-accent/85 text-white' : style === 'success' ? 'bg-[#22c55e]/70 text-white' : 'bg-[#ef4450]/70 text-white'}
+                                {dragSource?.row === rowIdx && dragSource?.col === colIdx ? 'opacity-20 scale-95' : ''}
+                                {dragOverTarget?.row === rowIdx && dragOverTarget?.col === colIdx ? 'ring-1 ring-white/50 scale-105' : ''}">
+                              {#if icon}
+                                <Icon name={icon} class="w-3 h-3 shrink-0" />
+                              {/if}
+                              <span class="truncate max-w-[70px]">{settings[`btn_${btnName}`] || btnName}</span>
+                            </div>
+                          {/each}
+                        </div>
                       {/each}
                     </div>
                   {:else}
-                    <div class="flex-1 flex items-center justify-center text-[12px] text-white/30">
+                    <div class="flex-1 flex items-center justify-center text-[12px] text-white/30 mt-4">
                       Нет кнопок
                     </div>
                   {/if}
+
                   <div class="flex-1"></div>
                   <div class="flex justify-center mt-1">
                     <div class="w-[30px] h-[3px] bg-white/20 rounded-full"></div>
@@ -555,59 +646,61 @@
           </div>
         </div>
 
-        <div class="card p-5 space-y-4">
-          <div class="flex items-center justify-between">
-            <h3 class="text-[15px] font-semibold flex items-center gap-2">
-              <Icon name="clipboard" class="w-4 h-4 text-accent" /> Активные кнопки
-            </h3>
-            <button onclick={saveButtonOrder} disabled={savingOrder} class="btn btn-primary btn-xs">
-              {savingOrder ? '...' : 'Сохранить порядок'}
-            </button>
-          </div>
-          <p class="text-[13px] text-muted">Перетащите кнопки для изменения порядка</p>
+        <div class="card p-5 space-y-3">
+          <h3 class="text-[15px] font-semibold flex items-center gap-2">
+            <Icon name="layoutDashboard" class="w-4 h-4 text-accent" /> Управление строками
+          </h3>
+          <p class="text-[12px] text-muted">Добавляйте и удаляйте строки. Кнопки перетаскиваются между строками в превью выше.</p>
           <div class="space-y-1.5">
-            {#each activeButtons as btn, i (btn.name)}
-              {@const style = settings[`btn_${btn.name}_style`] || ''}
-              {@const icon = settings[`btn_icon_${btn.name}`] || ''}
-              <div
-                draggable="true"
-                ondragstart={(e) => handleDragStart(e, i)}
-                ondragover={(e) => handleDragOver(e, i)}
-                ondrop={(e) => handleDrop(e, i)}
-                ondragend={handleDragEnd}
-                class="flex items-center gap-2 p-2.5 rounded-[10px] border cursor-pointer transition-all select-none
-                  {editingBtn === btn.name
-                    ? 'border-accent/40 bg-accent/8'
-                    : 'border-surface-4/20 bg-surface-3/40 hover:bg-surface-3/60 hover:border-surface-4/30'}
-                  {dragOverIndex === i ? '!border-accent/60 ring-1 ring-accent/30' : ''}
-                  {dragIndex === i ? 'opacity-40' : ''}"
-                onclick={() => selectButton(btn.name)}>
-                <span class="cursor-grab active:cursor-grabbing text-muted hover:text-white shrink-0">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0">
-                    <line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="18" x2="16" y2="18"/>
-                  </svg>
-                </span>
-                {#if icon}
-                  <div class="w-7 h-7 rounded-[7px] bg-surface-3 border border-surface-4/50 flex items-center justify-center shrink-0">
-                    <Icon name={icon} class="w-3.5 h-3.5 text-muted" />
-                  </div>
-                {:else}
-                  <div class="w-7 h-7 rounded-[7px] bg-surface-3 border border-surface-4/50 flex items-center justify-center shrink-0">
-                    <span class="text-[10px] text-muted">{btn.label[0]}</span>
-                  </div>
-                {/if}
-                <div class="flex-1 min-w-0">
-                  <p class="text-[13px] font-medium truncate">{settings[`btn_${btn.name}`] || btn.label}</p>
-                  <p class="text-[10px] text-muted font-mono">{btn.name}</p>
+            {#each buttonLayout as row, rowIdx (rowIdx)}
+              <div class="flex items-center gap-2 p-2 rounded-lg bg-surface-3/30 border border-surface-4/10">
+                <span class="text-[10px] text-muted font-mono w-5 text-center shrink-0">{rowIdx + 1}</span>
+                <div class="flex flex-wrap gap-1 flex-1 min-w-0">
+                  {#each row as btnName}
+                    {@const style = settings[`btn_${btnName}_style`] || ''}
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium
+                      {style === 'primary' ? 'bg-accent/20 text-accent' : style === 'success' ? 'bg-success/20 text-success' : style === 'danger' ? 'bg-danger/20 text-danger' : 'bg-surface-3 text-muted'}">
+                      {settings[`btn_${btnName}`] || btnName}
+                    </span>
+                  {/each}
+                  {#if row.length === 0}
+                    <span class="text-[11px] text-muted/40 italic">пусто</span>
+                  {/if}
                 </div>
-                {#if style}
-                  <span class="w-2 h-2 rounded-full shrink-0" style="background: {BTN_STYLE_COLORS[style] || '#8a8a9e'}"></span>
-                {/if}
+                <button onclick={() => removeRow(rowIdx)}
+                  class="shrink-0 w-5 h-5 rounded flex items-center justify-center text-muted hover:text-danger transition-colors">
+                  <Icon name="x" size={12} />
+                </button>
               </div>
             {/each}
           </div>
-          {#if activeButtons.length === 0}
-            <p class="text-sm text-muted text-center py-4">Нет активных кнопок. Добавьте кнопку ниже.</p>
+          <div class="flex gap-2">
+            <button onclick={addRow} class="btn btn-ghost btn-sm">
+              <Icon name="plus" class="w-3.5 h-3.5" /> Добавить строку
+            </button>
+          </div>
+
+          {#if unassignedButtons.length > 0}
+            <div class="border-t border-surface-4/20 pt-3 space-y-2">
+              <p class="text-[11px] text-muted font-medium uppercase tracking-wider">Не в раскладке</p>
+              <div class="flex flex-wrap gap-1.5"
+                ondragover={(e) => e.preventDefault()}
+                ondrop={handlePoolDrop}>
+                {#each unassignedButtons as btn}
+                  {@const style = settings[`btn_${btn.name}_style`] || ''}
+                  {@const icon = settings[`btn_icon_${btn.name}`] || ''}
+                  <button
+                    onclick={() => { addBtnToRow(btn.name, buttonLayout.length - 1); }}
+                    class="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium transition-all
+                      border border-dashed border-surface-4/40 hover:border-accent/50 hover:bg-accent/5 text-muted hover:text-text cursor-pointer">
+                    {#if icon}
+                      <Icon name={icon} class="w-3 h-3 shrink-0" />
+                    {/if}
+                    <span>{settings[`btn_${btn.name}`] || btn.label}</span>
+                  </button>
+                {/each}
+              </div>
+            </div>
           {/if}
         </div>
 
@@ -619,7 +712,7 @@
             <div class="flex gap-2">
               <select bind:value={addPreset} class="select flex-1">
                 <option value="">— Выберите кнопку —</option>
-                {#each BUTTON_PRESETS as p}
+                {#each BUTTON_PRESETS.filter(b => !layoutFlat.includes(b.name)) as p}
                   <option value={p.name}>{p.label}</option>
                 {/each}
               </select>
@@ -687,7 +780,7 @@
             <h3 class="text-[15px] font-semibold flex items-center gap-2">
               <Icon name="settings" class="w-4 h-4 text-accent" /> Все настройки
             </h3>
-            <p class="text-[13px] text-muted">Выберите кнопку слева для редактирования</p>
+            <p class="text-[13px] text-muted">Выберите кнопку слева для редактирования настроек</p>
             <button onclick={saveAllButtons} disabled={settingsLoading} class="btn btn-primary w-full">
               {#if settingsLoading}<div class="w-4 h-4 border-2 border-surface-4 border-t-white rounded-full animate-spin"></div>{/if}
               Сохранить все кнопки

@@ -92,7 +92,7 @@
 <Spinner {loading} />
 
 <div class="page-enter space-y-5">
-  <div class="flex items-center justify-between">
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
     <div>
       <h1 class="text-[28px] font-bold tracking-tight">Промокоды</h1>
       <p class="text-sm text-muted mt-1">{promos.length} промокодов</p>
@@ -115,7 +115,7 @@
       <label class="label"><span class="label-text">Код</span></label>
       <input type="text" bind:value={form.code} class="input w-full" placeholder="PROMO10" required />
     </div>
-    <div class="grid grid-cols-2 gap-4">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <div class="space-y-1">
         <label class="label"><span class="label-text">Тип скидки</span></label>
         <select bind:value={form.discount_type} class="select w-full">

@@ -67,7 +67,7 @@
 <Spinner {loading} />
 
 <div class="page-enter space-y-5">
-  <div class="flex items-center justify-between">
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
     <div>
       <h1 class="text-[28px] font-bold tracking-tight">Тарифы</h1>
       <p class="text-sm text-muted mt-1">{plans.length} тарифов</p>
@@ -94,7 +94,7 @@
       <label class="label"><span class="label-text">Описание</span></label>
       <textarea bind:value={form.description} class="textarea w-full h-20" placeholder="Описание тарифа"></textarea>
     </div>
-    <div class="grid grid-cols-2 gap-4">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <div class="space-y-1">
         <label class="label"><span class="label-text">Цена (₽)</span></label>
         <input type="number" bind:value={form.price} class="input w-full" min="0" required />

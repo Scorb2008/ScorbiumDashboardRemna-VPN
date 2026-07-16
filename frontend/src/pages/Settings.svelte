@@ -163,7 +163,7 @@
   </div>
 
   <!-- Top Inner Sidebar -->
-  <div class="flex gap-1 bg-surface-2 p-1 rounded-[10px] w-fit">
+  <div class="flex gap-1 bg-surface-2 p-1 rounded-[10px] w-fit overflow-x-auto whitespace-nowrap">
     {#each TABS as tab}
       <button
         onclick={() => activeTab = tab.id}
