@@ -113,6 +113,8 @@ def _translate_layout(layout: list, lang: str, settings: dict) -> list:
         for b in row:
             bid = b.get("id", "")
             override = settings.get(f"i18n_{lang}_btn_{bid}", "").strip()
+            if not override:
+                override = settings.get(f"btn_{bid}", "").strip()
             default_label = _BTN_LABELS.get(lang, _BTN_LABELS["ru"]).get(
                 bid, b.get("label", "")
             )
@@ -174,11 +176,29 @@ async def get_main_menu_kb(
 ) -> InlineKeyboardMarkup:
     s = await BotSettingsService(session).get_all()
 
-    # Load layout
+    # Load layout (support keyboard_layout JSON and btn_order CSV)
     raw_layout = s.get("keyboard_layout", "")
+    raw_btn_order = s.get("btn_order", "")
     try:
-        layout = json.loads(raw_layout) if raw_layout else _DEFAULT_LAYOUT
+        layout = json.loads(raw_layout) if raw_layout else None
     except Exception:
+        layout = None
+
+    if not layout and raw_btn_order:
+        order_ids = [x.strip() for x in raw_btn_order.split(",") if x.strip()]
+        if order_ids:
+            default_map = {}
+            for row in _DEFAULT_LAYOUT:
+                for b in row:
+                    default_map[b["id"]] = b
+            layout = []
+            for bid in order_ids:
+                if bid in default_map:
+                    layout.append([default_map[bid]])
+            if not layout:
+                layout = None
+
+    if not layout:
         layout = _DEFAULT_LAYOUT
 
     if user_id and s.get("trial_enabled", "0") == "1":
@@ -199,11 +219,21 @@ async def get_main_menu_kb(
     # Translate labels
     layout = _translate_layout(layout, lang, s)
 
-    # Load styles
-    styles = {bid: s.get(f"btn_style_{bid}", "") for bid in _BUTTON_IDS}
+    # Load styles (support both btn_style_{bid} and btn_{bid}_style)
+    styles = {}
+    for bid in _BUTTON_IDS:
+        style = s.get(f"btn_style_{bid}", "").strip()
+        if not style:
+            style = s.get(f"btn_{bid}_style", "").strip()
+        styles[bid] = style
 
-    # Load custom emojis
-    emojis = {bid: s.get(f"btn_emoji_{bid}", "") for bid in _BUTTON_IDS}
+    # Load custom emojis (support both btn_emoji_{bid} and btn_icon_{bid})
+    emojis = {}
+    for bid in _BUTTON_IDS:
+        emoji = s.get(f"btn_emoji_{bid}", "").strip()
+        if not emoji:
+            emoji = s.get(f"btn_icon_{bid}", "").strip()
+        emojis[bid] = emoji
 
     return main_menu_kb(
         support_url=s.get("support_url", ""),

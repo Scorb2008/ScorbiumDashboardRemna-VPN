@@ -1,9 +1,19 @@
 <script>
+  import { onMount } from 'svelte';
   import { router } from '../lib/stores.js';
   import { api } from '../lib/api.svelte.js';
   import Icon from './Icon.svelte';
 
   let { currentPath = $bindable('/dashboard'), onToggle } = $props();
+
+  let logoUrl = $state('');
+
+  onMount(async () => {
+    try {
+      const s = await api.getSettings();
+      logoUrl = s?.logo_url || '';
+    } catch {}
+  });
 
   const groups = [
     {
@@ -54,9 +64,13 @@
 
 <div class="flex flex-col h-full">
   <div class="flex items-center gap-3 px-5 py-5 border-b border-[#2a2a35]">
-    <div class="w-8 h-8 rounded-[10px] bg-accent flex items-center justify-center">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/></svg>
-    </div>
+    {#if logoUrl}
+      <img src={logoUrl} alt="Logo" class="w-8 h-8 rounded-[10px] object-cover shrink-0" />
+    {:else}
+      <div class="w-8 h-8 rounded-[10px] bg-accent flex items-center justify-center shrink-0">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/></svg>
+      </div>
+    {/if}
     <div>
       <p class="text-[14px] font-semibold text-text leading-tight">Scorbium</p>
       <p class="text-[11px] text-muted leading-tight">VPN Dashboard</p>
