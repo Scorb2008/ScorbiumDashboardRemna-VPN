@@ -6,6 +6,7 @@
   import Table from '../components/Table.svelte';
   import Modal from '../components/Modal.svelte';
   import Spinner from '../components/Spinner.svelte';
+  import Icon from '../components/Icon.svelte';
 
   let users = $state([]);
   let loading = $state(true);
@@ -17,13 +18,9 @@
 
   async function loadUsers() {
     loading = true;
-    try {
-      users = await api.getUsers({ limit: 500 });
-    } catch (e) {
-      toasts.error('Ошибка загрузки: ' + e.message);
-    } finally {
-      loading = false;
-    }
+    try { users = await api.getUsers({ limit: 500 }); }
+    catch (e) { toasts.error('Ошибка загрузки: ' + e.message); }
+    finally { loading = false; }
   }
 
   onMount(loadUsers);
@@ -41,37 +38,25 @@
     selectedUser = user;
     showModal = true;
     detailLoading = true;
-    try {
-      userDetail = await api.getUser(user.id);
-    } catch (e) {
-      toasts.error('Ошибка загрузки деталей');
-    } finally {
-      detailLoading = false;
-    }
+    try { userDetail = await api.getUser(user.id); }
+    catch (e) { toasts.error('Ошибка загрузки деталей'); }
+    finally { detailLoading = false; }
   }
 
   async function handleBan() {
     if (!selectedUser) return;
     try {
-      if (selectedUser.is_banned) {
-        await api.unbanUser(selectedUser.id);
-        toasts.success('Пользователь разбанен');
-      } else {
-        await api.banUser(selectedUser.id);
-        toasts.success('Пользователь забанен');
-      }
-      await loadUsers();
-      showModal = false;
-    } catch (e) {
-      toasts.error(e.message);
-    }
+      if (selectedUser.is_banned) { await api.unbanUser(selectedUser.id); toasts.success('Пользователь разбанен'); }
+      else { await api.banUser(selectedUser.id); toasts.success('Пользователь забанен'); }
+      await loadUsers(); showModal = false;
+    } catch (e) { toasts.error(e.message); }
   }
 
   const columns = [
     { key: 'id', label: 'ID', sortable: true },
-    { key: 'username', label: 'Username', sortable: true, render: (r) => `<span class="text-primary font-mono text-xs">@${r.username || '—'}</span>` },
-    { key: 'full_name', label: 'Имя', sortable: true, render: (r) => `<span class="text-sm">${r.full_name || '—'}</span>` },
-    { key: 'created_at', label: 'Создан', sortable: true, render: (r) => `<span class="text-xs text-base-content/50">${formatDate(r.created_at)}</span>` },
+    { key: 'username', label: 'Username', sortable: true, render: (r) => `<span class="font-mono text-xs text-zinc-400">@${r.username || '—'}</span>` },
+    { key: 'full_name', label: 'Имя', sortable: true },
+    { key: 'created_at', label: 'Создан', sortable: true, render: (r) => `<span class="text-xs text-muted">${formatDate(r.created_at)}</span>` },
   ];
 </script>
 
@@ -80,19 +65,15 @@
 <div class="page-enter space-y-5">
   <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
     <div>
-      <h1 class="text-2xl font-bold">Пользователи</h1>
-      <p class="text-sm text-base-content/40 mt-1">{filteredUsers.length} из {users.length}</p>
+      <h1 class="text-[28px] font-bold tracking-tight">Пользователи</h1>
+      <p class="text-sm text-muted mt-1">{filteredUsers.length} из {users.length}</p>
     </div>
-    <input
-      type="text"
-      bind:value={search}
-      placeholder="Поиск по ID, username, имени..."
-      class="input input-bordered input-glass w-full sm:w-80" />
+    <input type="text" bind:value={search} placeholder="Поиск по ID, username, имени..." class="input w-full sm:w-80" />
   </div>
 
   <Table columns={columns} data={filteredUsers} onRowClick={openDetail}>
     {#snippet actions(row)}
-      <span class="badge badge-sm badge-glow {row.is_banned ? 'badge-error' : 'badge-success'}">
+      <span class="badge {row.is_banned ? 'badge-danger' : 'badge-success'}">
         {row.is_banned ? 'Забанен' : 'Активен'}
       </span>
     {/snippet}
@@ -101,68 +82,55 @@
 
 <Modal bind:open={showModal} title="Профиль пользователя" size="lg">
   {#if detailLoading}
-    <div class="flex justify-center py-8"><span class="loading loading-spinner loading-md text-primary"></span></div>
+    <div class="flex justify-center py-8"><div class="w-6 h-6 border-2 border-surface-4 border-t-accent rounded-full animate-spin"></div></div>
   {:else if userDetail}
     <div class="space-y-4">
       <div class="flex items-center gap-4">
-        <div class="w-14 h-14 rounded-2xl gradient-primary flex items-center justify-center text-white text-xl font-bold">
+        <div class="w-12 h-12 rounded-[12px] bg-surface-3 border border-surface-4 flex items-center justify-center text-lg font-bold">
           {(userDetail.full_name || userDetail.username || '?')[0].toUpperCase()}
         </div>
         <div>
-          <h3 class="text-lg font-semibold">{userDetail.full_name || 'Без имени'}</h3>
-          <p class="text-sm text-base-content/50">
-            {#if userDetail.username}@{userDetail.username}{/if}
-            <span class="mx-2">|</span>
-            ID: {userDetail.id}
-          </p>
+          <h3 class="text-[15px] font-semibold">{userDetail.full_name || 'Без имени'}</h3>
+          <p class="text-xs text-muted">{userDetail.username ? `@${userDetail.username}` : ''} &middot; ID: {userDetail.id}</p>
         </div>
       </div>
 
-      <div class="divider"></div>
+      <div class="border-t border-surface-4/50"></div>
 
       <div class="grid grid-cols-2 gap-3">
-        <div class="glass rounded-xl p-3 text-center">
-          <p class="text-2xl font-bold text-primary">{userDetail.vpn_keys_count ?? 0}</p>
-          <p class="text-xs text-base-content/40">VPN Ключей</p>
+        <div class="bg-surface-3 rounded-[10px] p-4 text-center">
+          <p class="text-2xl font-bold">{userDetail.vpn_keys_count ?? 0}</p>
+          <p class="text-[11px] text-muted mt-1">VPN Ключей</p>
         </div>
-        <div class="glass rounded-xl p-3 text-center">
-          <p class="text-2xl font-bold text-secondary">{userDetail.payments_count ?? 0}</p>
-          <p class="text-xs text-base-content/40">Платежей</p>
-        </div>
-      </div>
-
-      <div class="space-y-2 text-sm">
-        <div class="flex justify-between py-1.5 border-b border-base-300/50">
-          <span class="text-base-content/50">Статус</span>
-          <span class="badge badge-sm {userDetail.is_banned ? 'badge-error' : 'badge-success'}">
-            {userDetail.is_banned ? 'Забанен' : 'Активен'}
-          </span>
-        </div>
-        <div class="flex justify-between py-1.5 border-b border-base-300/50">
-          <span class="text-base-content/50">Баланс</span>
-          <span class="font-medium">{userDetail.balance ?? 0} RUB</span>
-        </div>
-        <div class="flex justify-between py-1.5 border-b border-base-300/50">
-          <span class="text-base-content/50">Язык</span>
-          <span>{userDetail.language || '—'}</span>
-        </div>
-        <div class="flex justify-between py-1.5 border-b border-base-300/50">
-          <span class="text-base-content/50">Автопродление</span>
-          <span>{userDetail.autorenew ? 'Вкл' : 'Выкл'}</span>
-        </div>
-        <div class="flex justify-between py-1.5 border-b border-base-300/50">
-          <span class="text-base-content/50">Создан</span>
-          <span>{formatDateTime(userDetail.created_at)}</span>
-        </div>
-        <div class="flex justify-between py-1.5">
-          <span class="text-base-content/50">Последний вход</span>
-          <span>{formatDateTime(userDetail.last_seen)}</span>
+        <div class="bg-surface-3 rounded-[10px] p-4 text-center">
+          <p class="text-2xl font-bold">{userDetail.payments_count ?? 0}</p>
+          <p class="text-[11px] text-muted mt-1">Платежей</p>
         </div>
       </div>
 
-      <div class="divider"></div>
+      <div class="space-y-0 text-[13px]">
+        {#each [
+          ['Статус', userDetail.is_banned ? 'Забанен' : 'Активен', userDetail.is_banned ? 'badge-danger' : 'badge-success'],
+          ['Баланс', `${userDetail.balance ?? 0} RUB`, null],
+          ['Язык', userDetail.language || '—', null],
+          ['Автопродление', userDetail.autorenew ? 'Вкл' : 'Выкл', null],
+          ['Создан', formatDateTime(userDetail.created_at), null],
+          ['Последний вход', formatDateTime(userDetail.last_seen), null],
+        ] as [label, value, badge]}
+          <div class="flex justify-between py-2.5 border-b border-surface-4/30">
+            <span class="text-muted">{label}</span>
+            {#if badge}
+              <span class="badge {badge}">{value}</span>
+            {:else}
+              <span>{value}</span>
+            {/if}
+          </div>
+        {/each}
+      </div>
 
-      <button onclick={handleBan} class="btn w-full {selectedUser?.is_banned ? 'btn-success' : 'btn-error'}">
+      <div class="border-t border-surface-4/50"></div>
+
+      <button onclick={handleBan} class="btn {selectedUser?.is_banned ? 'btn-primary' : 'btn-danger'} w-full">
         {selectedUser?.is_banned ? 'Разбанить' : 'Забанить'}
       </button>
     </div>

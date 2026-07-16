@@ -2,84 +2,79 @@
   import { onMount } from 'svelte';
   import { api } from '../lib/api.svelte.js';
   import { toasts } from '../lib/stores.js';
-  import StatsCard from '../components/StatsCard.svelte';
   import Spinner from '../components/Spinner.svelte';
+  import Icon from '../components/Icon.svelte';
 
   let botInfo = $state(null);
   let loading = $state(true);
-  let chatId = $state('');
-  let message = $state('');
-  let sending = $state(false);
 
-  onMount(async () => {
-    try {
-      botInfo = await api.getBotInfo();
-    } catch (e) {
-      toasts.error('Не удалось загрузить информацию о боте');
-    } finally {
-      loading = false;
-    }
-  });
-
-  async function handleSend() {
-    if (!chatId.trim() || !message.trim()) {
-      toasts.warning('Заполните все поля');
-      return;
-    }
-    sending = true;
-    try {
-      await api.sendTelegramMessage(chatId, message);
-      toasts.success('Сообщение отправлено');
-      message = '';
-    } catch (e) {
-      toasts.error('Ошибка: ' + e.message);
-    } finally {
-      sending = false;
-    }
+  async function loadBotInfo() {
+    loading = true;
+    try { botInfo = await api.getBotInfo(); }
+    catch (e) { toasts.error('Ошибка загрузки: ' + e.message); }
+    finally { loading = false; }
   }
+
+  onMount(loadBotInfo);
 </script>
 
 <Spinner {loading} />
 
 <div class="page-enter space-y-5">
   <div>
-    <h1 class="text-2xl font-bold">Telegram</h1>
-    <p class="text-sm text-base-content/40 mt-1">Информация о боте и отправка сообщений</p>
+    <h1 class="text-[28px] font-bold tracking-tight">Telegram Бот</h1>
+    <p class="text-sm text-muted mt-1">Информация о подключённом Telegram-боте</p>
   </div>
 
   {#if botInfo}
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      <StatsCard label="Username" value={`@${botInfo.username || '—'}`} icon="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" gradient="gradient-info" />
-      <StatsCard label="Bot ID" value={botInfo.id ?? '—'} icon="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0" gradient="gradient-primary" />
-      <StatsCard label="Имя" value={botInfo.first_name || '—'} icon="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" gradient="gradient-success" />
+    <div class="card p-5 space-y-4">
+      <div class="flex items-center gap-4">
+        <div class="w-14 h-14 rounded-[12px] bg-surface-3 border border-surface-4 flex items-center justify-center">
+          <Icon name="bot" class="w-7 h-7 text-accent" />
+        </div>
+        <div>
+          <h3 class="text-[15px] font-semibold">{botInfo.first_name || '—'}</h3>
+          <p class="text-xs text-muted">@{botInfo.username || '—'}</p>
+        </div>
+      </div>
+
+      <div class="border-t border-surface-4/50"></div>
+
+      <div class="space-y-0 text-[13px]">
+        {#each [
+          ['Bot ID', botInfo.id || '—'],
+          ['Имя', botInfo.first_name || '—'],
+          ['Username', botInfo.username ? '@' + botInfo.username : '—'],
+          ['Can join groups', botInfo.can_join_groups ? 'Да' : 'Нет'],
+          ['Can read messages', botInfo.can_read_all_group_messages ? 'Да' : 'Нет'],
+          ['Supports inline', botInfo.supports_inline_queries ? 'Да' : 'Нет'],
+          ['Webhook', botInfo.webhook_url || 'Не настроен'],
+        ] as [label, value]}
+          <div class="flex justify-between py-2.5 border-b border-surface-4/30">
+            <span class="text-muted">{label}</span>
+            <span>{value}</span>
+          </div>
+        {/each}
+      </div>
     </div>
 
     <div class="card p-5">
-      <h2 class="font-semibold mb-4">Отправить сообщение</h2>
-      <div class="space-y-4">
-        <div class="form-control">
-          <label class="label"><span class="label-text text-xs font-medium">Chat ID пользователя</span></label>
-          <input type="text" bind:value={chatId} class="input input-bordered input-glass" placeholder="123456789" />
-        </div>
-        <div class="form-control">
-          <label class="label"><span class="label-text text-xs font-medium">Текст сообщения (HTML)</span></label>
-          <textarea bind:value={message} class="textarea textarea-bordered input-glass h-28 font-mono text-sm" placeholder="<b>Привет!</b> Это сообщение от администратора."></textarea>
-        </div>
-        <div class="flex justify-end">
-          <button class="btn btn-primary btn-glow" disabled={sending} onclick={handleSend}>
-            {#if sending}
-              <span class="loading loading-spinner loading-sm"></span>
-            {:else}
-              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
-            {/if}
-            Отправить
-          </button>
-        </div>
+      <h3 class="text-[15px] font-semibold mb-3">Команды бота</h3>
+      <div class="space-y-0 text-[13px]">
+        {#each [
+          ['/start', 'Главное меню'],
+          ['/buy', 'Купить подписку'],
+          ['/my_keys', 'Мои VPN ключи'],
+          ['/profile', 'Профиль'],
+          ['/support', 'Поддержка'],
+          ['/language', 'Смена языка'],
+        ] as [cmd, desc]}
+          <div class="flex justify-between py-2 border-b border-surface-4/30 last:border-0">
+            <code class="font-mono text-xs text-accent">{cmd}</code>
+            <span class="text-muted">{desc}</span>
+          </div>
+        {/each}
       </div>
-    </div>
-  {:else if !loading}
-    <div class="card p-12 text-center text-base-content/30">
-      <p>Не удалось загрузить информацию о боте. Проверьте настройки Telegram.</p>
     </div>
   {/if}
 </div>

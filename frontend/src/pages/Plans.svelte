@@ -2,89 +2,65 @@
   import { onMount } from 'svelte';
   import { api } from '../lib/api.svelte.js';
   import { toasts } from '../lib/stores.js';
-  import { formatPrice } from '../lib/utils.js';
+  import { formatPrice, formatDate } from '../lib/utils.js';
   import Table from '../components/Table.svelte';
   import Modal from '../components/Modal.svelte';
-  import ConfirmDialog from '../components/ConfirmDialog.svelte';
   import Spinner from '../components/Spinner.svelte';
+  import ConfirmDialog from '../components/ConfirmDialog.svelte';
+  import Icon from '../components/Icon.svelte';
 
   let plans = $state([]);
   let loading = $state(true);
   let showModal = $state(false);
-  let editing = $state(null);
-  let showDelete = $state(false);
-  let form = $state({ name: '', slug: '', duration_days: 30, price: 0, currency: 'RUB', description: '', sort_order: 0 });
+  let editPlan = $state(null);
+  let confirmDelete = $state(false);
+  let deleteTarget = $state(null);
+
+  let form = $state({ name: '', description: '', price: 0, duration_days: 30, traffic_gb: 0, device_limit: 3, is_active: true, is_trial: false });
 
   async function loadPlans() {
     loading = true;
-    try {
-      plans = await api.getPlans();
-    } catch (e) {
-      toasts.error(e.message);
-    } finally {
-      loading = false;
-    }
+    try { plans = await api.getPlans({ limit: 100 }); }
+    catch (e) { toasts.error('Ошибка загрузки тарифов: ' + e.message); }
+    finally { loading = false; }
   }
 
   onMount(loadPlans);
 
   function openCreate() {
-    editing = null;
-    form = { name: '', slug: '', duration_days: 30, price: 0, currency: 'RUB', description: '', sort_order: 0 };
+    editPlan = null;
+    form = { name: '', description: '', price: 0, duration_days: 30, traffic_gb: 0, device_limit: 3, is_active: true, is_trial: false };
     showModal = true;
   }
-
   function openEdit(plan) {
-    editing = plan;
-    form = { name: plan.name, slug: plan.slug, duration_days: plan.duration_days, price: plan.price, currency: plan.currency, description: plan.description || '', sort_order: plan.sort_order || 0 };
+    editPlan = plan;
+    form = { name: plan.name || '', description: plan.description || '', price: plan.price || 0, duration_days: plan.duration_days || 30, traffic_gb: plan.traffic_gb || 0, device_limit: plan.device_limit || 3, is_active: plan.is_active !== false, is_trial: plan.is_trial || false };
     showModal = true;
   }
 
-  async function handleSave() {
+  async function savePlan() {
     try {
-      if (editing) {
-        await api.updatePlan(editing.id, form);
-        toasts.success('Тариф обновлён');
-      } else {
-        await api.createPlan(form);
-        toasts.success('Тариф создан');
-      }
-      showModal = false;
-      await loadPlans();
-    } catch (e) {
-      toasts.error(e.message);
-    }
+      if (editPlan) { await api.updatePlan(editPlan.id, form); toasts.success('Тариф обновлён'); }
+      else { await api.createPlan(form); toasts.success('Тариф создан'); }
+      showModal = false; await loadPlans();
+    } catch (e) { toasts.error(e.message); }
   }
 
-  async function handleToggle(plan) {
-    try {
-      await api.togglePlan(plan.id);
-      toasts.success('Статус изменён');
-      await loadPlans();
-    } catch (e) {
-      toasts.error(e.message);
-    }
-  }
-
-  async function handleDelete() {
-    if (!editing) return;
-    try {
-      await api.deletePlan(editing.id);
-      toasts.success('Тариф удалён');
-      showDelete = false;
-      await loadPlans();
-    } catch (e) {
-      toasts.error(e.message);
-    }
+  function askDelete(plan) { deleteTarget = plan; confirmDelete = true; }
+  async function doDelete() {
+    if (!deleteTarget) return;
+    try { await api.deletePlan(deleteTarget.id); toasts.success('Тариф удалён'); await loadPlans(); }
+    catch (e) { toasts.error(e.message); }
+    confirmDelete = false; deleteTarget = null;
   }
 
   const columns = [
     { key: 'id', label: 'ID', sortable: true },
     { key: 'name', label: 'Название', sortable: true, render: (r) => `<span class="font-medium">${r.name}</span>` },
-    { key: 'slug', label: 'Slug', render: (r) => `<span class="text-xs text-base-content/50">${r.slug}</span>` },
-    { key: 'duration_days', label: 'Дней', sortable: true, render: (r) => `<span class="text-base-content/60">${r.duration_days} дн.</span>` },
-    { key: 'price', label: 'Цена', sortable: true, render: (r) => `<span class="font-medium text-primary">${formatPrice(r.price, r.currency)}</span>` },
-    { key: 'currency', label: 'Валюта' },
+    { key: 'price', label: 'Цена', sortable: true, render: (r) => `<span class="font-mono text-xs">${formatPrice(r.price)}</span>` },
+    { key: 'duration_days', label: 'Дней', sortable: true },
+    { key: 'traffic_gb', label: 'Трафик', sortable: true, render: (r) => r.traffic_gb ? `${r.traffic_gb} ГБ` : '∞' },
+    { key: 'device_limit', label: 'Устр.', sortable: true },
   ];
 </script>
 
@@ -93,81 +69,64 @@
 <div class="page-enter space-y-5">
   <div class="flex items-center justify-between">
     <div>
-      <h1 class="text-2xl font-bold">Тарифы</h1>
-      <p class="text-sm text-base-content/40 mt-1">{plans.length} тарифов</p>
+      <h1 class="text-[28px] font-bold tracking-tight">Тарифы</h1>
+      <p class="text-sm text-muted mt-1">{plans.length} тарифов</p>
     </div>
-    <button onclick={openCreate} class="btn btn-primary btn-sm btn-glow gap-2">
-      Создать
-    </button>
+    <button class="btn btn-primary" onclick={openCreate}><Icon name="plus" class="w-4 h-4" /> Новый тариф</button>
   </div>
 
   <Table columns={columns} data={plans}>
     {#snippet actions(row)}
-      <div class="flex items-center gap-2">
-        <span class="badge badge-sm badge-glow {row.is_active ? 'badge-success' : 'badge-ghost'}">
-          {row.is_active ? 'Активен' : 'Выкл'}
-        </span>
-        <div class="dropdown dropdown-end">
-          <button tabindex="0" class="btn btn-xs btn-ghost btn-circle">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" /></svg>
-          </button>
-          <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow-lg bg-base-200 rounded-xl w-40 border border-base-300/50">
-            <li><button onclick={() => handleToggle(row)}>{row.is_active ? 'Выключить' : 'Включить'}</button></li>
-            <li><button onclick={() => openEdit(row)}>Редактировать</button></li>
-            <li><button class="text-error" onclick={() => { editing = row; showDelete = true; }}>Удалить</button></li>
-          </ul>
-        </div>
-      </div>
+      <span class="badge {row.is_active !== false ? 'badge-success' : 'badge-danger'}">{row.is_active !== false ? 'Активен' : 'Неактивен'}</span>
+      <button class="btn btn-ghost text-muted hover:text-zinc-300" onclick={() => openEdit(row)}><Icon name="pencil" class="w-3.5 h-3.5" /></button>
+      <button class="btn btn-ghost text-danger hover:text-danger-hover" onclick={() => askDelete(row)}><Icon name="trash-2" class="w-3.5 h-3.5" /></button>
     {/snippet}
   </Table>
 </div>
 
-<Modal bind:open={showModal} title={editing ? 'Редактировать тариф' : 'Новый тариф'} size="md">
-  <div class="space-y-4">
-    <div class="form-control">
-      <label class="label"><span class="label-text text-xs font-medium">Название</span></label>
-      <input type="text" bind:value={form.name} class="input input-bordered input-glass" placeholder="30 дней" />
+<Modal bind:open={showModal} title={editPlan ? 'Редактировать тариф' : 'Новый тариф'}>
+  <form class="space-y-4" onsubmit={(e) => { e.preventDefault(); savePlan(); }}>
+    <div class="space-y-1">
+      <label class="label"><span class="label-text">Название</span></label>
+      <input type="text" bind:value={form.name} class="input w-full" placeholder="Название тарифа" required />
     </div>
-    <div class="form-control">
-      <label class="label"><span class="label-text text-xs font-medium">Slug</span></label>
-      <input type="text" bind:value={form.slug} class="input input-bordered input-glass" placeholder="30_days" disabled={!!editing} />
+    <div class="space-y-1">
+      <label class="label"><span class="label-text">Описание</span></label>
+      <textarea bind:value={form.description} class="textarea w-full h-20" placeholder="Описание тарифа"></textarea>
     </div>
-    <div class="grid grid-cols-2 gap-3">
-      <div class="form-control">
-        <label class="label"><span class="label-text text-xs font-medium">Дней</span></label>
-        <input type="number" bind:value={form.duration_days} class="input input-bordered input-glass" min="1" />
+    <div class="grid grid-cols-2 gap-4">
+      <div class="space-y-1">
+        <label class="label"><span class="label-text">Цена (₽)</span></label>
+        <input type="number" bind:value={form.price} class="input w-full" min="0" required />
       </div>
-      <div class="form-control">
-        <label class="label"><span class="label-text text-xs font-medium">Цена</span></label>
-        <input type="number" bind:value={form.price} class="input input-bordered input-glass" min="0" />
+      <div class="space-y-1">
+        <label class="label"><span class="label-text">Дней</span></label>
+        <input type="number" bind:value={form.duration_days} class="input w-full" min="1" required />
       </div>
-    </div>
-    <div class="grid grid-cols-2 gap-3">
-      <div class="form-control">
-        <label class="label"><span class="label-text text-xs font-medium">Валюта</span></label>
-        <input type="text" bind:value={form.currency} class="input input-bordered input-glass" />
+      <div class="space-y-1">
+        <label class="label"><span class="label-text">Трафик (ГБ, 0=∞)</span></label>
+        <input type="number" bind:value={form.traffic_gb} class="input w-full" min="0" />
       </div>
-      <div class="form-control">
-        <label class="label"><span class="label-text text-xs font-medium">Порядок</span></label>
-        <input type="number" bind:value={form.sort_order} class="input input-bordered input-glass" />
+      <div class="space-y-1">
+        <label class="label"><span class="label-text">Устройства</span></label>
+        <input type="number" bind:value={form.device_limit} class="input w-full" min="1" />
       </div>
     </div>
-    <div class="form-control">
-      <label class="label"><span class="label-text text-xs font-medium">Описание</span></label>
-      <textarea bind:value={form.description} class="textarea textarea-bordered input-glass h-20" placeholder="Описание тарифа..."></textarea>
+    <div class="flex items-center gap-3">
+      <label class="flex items-center gap-2 cursor-pointer">
+        <input type="checkbox" bind:checked={form.is_active} class="w-4 h-4 rounded accent-accent" />
+        <span class="text-sm">Активен</span>
+      </label>
+      <label class="flex items-center gap-2 cursor-pointer">
+        <input type="checkbox" bind:checked={form.is_trial} class="w-4 h-4 rounded accent-accent" />
+        <span class="text-sm">Пробный</span>
+      </label>
     </div>
-    <div class="flex gap-3 justify-end pt-2">
-      <button class="btn btn-ghost" onclick={() => showModal = false}>Отмена</button>
-      <button class="btn btn-primary btn-glow" onclick={handleSave}>{editing ? 'Сохранить' : 'Создать'}</button>
+    <div class="flex gap-3 pt-2">
+      <button type="button" class="btn btn-secondary flex-1" onclick={() => showModal = false}>Отмена</button>
+      <button type="submit" class="btn btn-primary flex-1">{editPlan ? 'Сохранить' : 'Создать'}</button>
     </div>
-  </div>
+  </form>
 </Modal>
 
-<ConfirmDialog
-  bind:show={showDelete}
-  title="Удалить тариф?"
-  message={`Тариф «${editing?.name}» будет удалён безвозвратно.`}
-  confirmText="Удалить"
-  confirmClass="btn-error"
-  onConfirm={handleDelete}
-  onCancel={() => showDelete = false} />
+<ConfirmDialog bind:open={confirmDelete} title="Удалить тариф?" message={`Удалить тариф «${deleteTarget?.name}»?`} confirmText="Удалить" danger onConfirm={doDelete} />

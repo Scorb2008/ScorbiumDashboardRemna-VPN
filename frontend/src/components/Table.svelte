@@ -9,55 +9,51 @@
 
 <div class="card overflow-hidden">
   <div class="overflow-x-auto">
-    <table class="table table-zebra">
+    <table class="w-full text-sm">
       <thead>
-        <tr>
+        <tr class="border-b border-surface-4/50">
           {#each columns as col}
             <th
-              class="{col.sortable ? 'cursor-pointer hover:bg-base-300/50 select-none' : ''} text-xs font-medium uppercase tracking-wider"
+              class="px-5 py-3 text-left text-[11px] font-medium text-muted uppercase tracking-wider {col.sortable ? 'cursor-pointer hover:text-accent select-none' : ''}"
               onclick={() => handleSort(col)}>
               <div class="flex items-center gap-1">
                 {col.label}
                 {#if sortCol === col.key}
-                  <span class="text-primary text-xs">{sortDir === 'asc' ? '↑' : '↓'}</span>
+                  <span class="text-accent text-xs">{sortDir === 'asc' ? '↑' : '↓'}</span>
                 {/if}
               </div>
             </th>
           {/each}
           {#if actions}
-            <th class="text-xs font-medium uppercase tracking-wider w-1"></th>
+            <th class="px-5 py-3 w-1"></th>
           {/if}
         </tr>
       </thead>
       <tbody>
         {#if data.length === 0}
           <tr>
-            <td colspan={actions ? columns.length + 1 : columns.length} class="text-center py-12">
-              <div class="flex flex-col items-center gap-2 text-base-content/30">
-                <svg class="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                </svg>
-                <span class="text-sm">{emptyText}</span>
+            <td colspan={actions ? columns.length + 1 : columns.length} class="px-5 py-16 text-center">
+              <div class="flex flex-col items-center gap-2 text-muted/50">
+                <p class="text-sm">{emptyText}</p>
               </div>
             </td>
           </tr>
         {:else}
           {#each data as row, i (row.id || i)}
             <tr
-              class="animate-fade-in {onRowClick ? 'cursor-pointer hover:bg-base-300/30' : ''}"
-              style="animation-delay: {i * 15}ms"
+              class="border-b border-surface-4/30 transition-colors {onRowClick ? 'cursor-pointer hover:bg-surface-3/50' : ''}"
               onclick={() => onRowClick?.(row)}>
               {#each columns as col}
-                <td>
+                <td class="px-5 py-3">
                   {#if col.render}
                     {@html col.render(row)}
                   {:else}
-                    <span class="text-sm">{row[col.key] ?? '—'}</span>
+                    <span class="text-[13px]">{row[col.key] ?? '—'}</span>
                   {/if}
                 </td>
               {/each}
               {#if actions}
-                <td onclick={(e) => e.stopPropagation()}>
+                <td class="px-5 py-3" onclick={(e) => e.stopPropagation()}>
                   {@render actions(row)}
                 </td>
               {/if}

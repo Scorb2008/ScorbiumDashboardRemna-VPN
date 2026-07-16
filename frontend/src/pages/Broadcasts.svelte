@@ -2,161 +2,95 @@
   import { onMount } from 'svelte';
   import { api } from '../lib/api.svelte.js';
   import { toasts } from '../lib/stores.js';
-  import { formatDateTime, truncate } from '../lib/utils.js';
-  import Modal from '../components/Modal.svelte';
+  import { formatDateTime } from '../lib/utils.js';
   import Spinner from '../components/Spinner.svelte';
+  import Icon from '../components/Icon.svelte';
 
-  let broadcasts = $state([]);
+  let broadcastHistory = $state([]);
   let loading = $state(true);
-  let showModal = $state(false);
-  let form = $state({ title: '', text: '', target: 'all', parse_mode: 'HTML' });
-  let sending = $state(null);
+  let text = $state('');
+  let target = $state('all');
+  let sending = $state(false);
 
-  async function loadBroadcasts() {
+  async function loadHistory() {
     loading = true;
+    try { broadcastHistory = await api.getBroadcastHistory({ limit: 50 }); }
+    catch (e) { toasts.error('Ошибка загрузки: ' + e.message); }
+    finally { loading = false; }
+  }
+
+  onMount(loadHistory);
+
+  async function sendBroadcast() {
+    if (!text.trim()) return toasts.error('Введите текст рассылки');
+    sending = true;
     try {
-      broadcasts = await api.getBroadcasts({ limit: 50 });
-    } catch (e) {
-      toasts.error(e.message);
-    } finally {
-      loading = false;
-    }
-  }
-
-  onMount(loadBroadcasts);
-
-  async function handleCreate() {
-    try {
-      await api.createBroadcast(form);
-      toasts.success('Рассылка создана');
-      showModal = false;
-      form = { title: '', text: '', target: 'all', parse_mode: 'HTML' };
-      await loadBroadcasts();
-    } catch (e) {
-      toasts.error(e.message);
-    }
-  }
-
-  async function handleSend(broadcast) {
-    sending = broadcast.id;
-    try {
-      await api.sendBroadcast(broadcast.id);
-      toasts.success('Рассылка отправлена');
-      await loadBroadcasts();
-    } catch (e) {
-      toasts.error(e.message);
-    } finally {
-      sending = null;
-    }
-  }
-
-  function statusBadge(status) {
-    const map = { draft: 'badge-ghost', sending: 'badge-warning', done: 'badge-success', failed: 'badge-error' };
-    return map[status] || 'badge-ghost';
-  }
-
-  function statusLabel(s) {
-    const map = { draft: 'Черновик', sending: 'Отправка', done: 'Отправлено', failed: 'Ошибка' };
-    return map[s] || s;
-  }
-
-  function targetLabel(t) {
-    const map = { all: 'Все', active: 'Активные', expired: 'Истёкшие' };
-    return map[t] || t;
+      await api.sendBroadcast({ text: text.trim(), target });
+      toasts.success('Рассылка отправлена!');
+      text = '';
+      await loadHistory();
+    } catch (e) { toasts.error('Ошибка: ' + e.message); }
+    finally { sending = false; }
   }
 </script>
 
 <Spinner {loading} />
 
 <div class="page-enter space-y-5">
-  <div class="flex items-center justify-between">
-    <div>
-      <h1 class="text-2xl font-bold">Рассылки</h1>
-      <p class="text-sm text-base-content/40 mt-1">{broadcasts.length} рассылок</p>
-    </div>
-    <button onclick={() => showModal = true} class="btn btn-primary btn-sm btn-glow gap-2">
-      <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" /></svg>
-      Создать
-    </button>
+  <div>
+    <h1 class="text-[28px] font-bold tracking-tight">Рассылки</h1>
+    <p class="text-sm text-muted mt-1">Массовые сообщения пользователям бота</p>
   </div>
 
-  {#if broadcasts.length === 0}
-    <div class="card p-12 text-center text-base-content/30">
-      <svg class="w-12 h-12 mx-auto mb-3 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" /></svg>
-      <p>Нет рассылок</p>
+  <div class="card p-5">
+    <h3 class="text-[15px] font-semibold mb-4">Новая рассылка</h3>
+    <div class="space-y-3">
+      <div class="space-y-1">
+        <label class="label"><span class="label-text">Целевая аудитория</span></label>
+        <select bind:value={target} class="select w-full">
+          <option value="all">Все пользователи</option>
+          <option value="active">Активные (за 7 дней)</option>
+          <option value="paid">Платившие</option>
+          <option value="expired">С истёкшим ключом</option>
+        </select>
+      </div>
+      <div class="space-y-1">
+        <label class="label"><span class="label-text">Текст сообщения</span></label>
+        <textarea bind:value={text} class="textarea w-full h-28" placeholder="Текст рассылки..."></textarea>
+      </div>
+      <button class="btn btn-primary" onclick={sendBroadcast} disabled={sending || !text.trim()}>
+        {#if sending}
+          <div class="w-4 h-4 border-2 border-surface-4 border-t-white rounded-full animate-spin"></div>
+        {:else}
+          <Icon name="send" class="w-4 h-4" />
+        {/if}
+        Отправить
+      </button>
     </div>
-  {:else}
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {#each broadcasts as bc, i (bc.id)}
-        <div class="card p-5 animate-slide-up" style="animation-delay: {i * 30}ms">
-          <div class="flex items-start justify-between mb-3">
-            <div class="flex-1 min-w-0">
-              <h3 class="font-medium truncate">{bc.title}</h3>
-              <p class="text-xs text-base-content/40 mt-1">#{bc.id} &middot; {targetLabel(bc.target)} &middot; {formatDateTime(bc.created_at)}</p>
+  </div>
+
+  {#if broadcastHistory.length > 0}
+    <div class="card p-5">
+      <h3 class="text-[15px] font-semibold mb-4">История рассылок</h3>
+      <div class="space-y-0">
+        {#each broadcastHistory as bc}
+          <div class="flex items-start gap-4 py-3 border-b border-surface-4/30 last:border-0">
+            <div class="w-8 h-8 rounded-[8px] bg-surface-3 border border-surface-4 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <Icon name="send" class="w-3.5 h-3.5 text-muted" />
             </div>
-            <span class="badge badge-sm badge-glow flex-shrink-0 ml-2 {statusBadge(bc.status)}">{statusLabel(bc.status)}</span>
-          </div>
-          <p class="text-sm text-base-content/60 mb-3 line-clamp-2">{truncate(bc.text, 120)}</p>
-          <div class="flex items-center justify-between">
-            <div class="text-xs text-base-content/40">
-              {#if bc.sent_count > 0}
-                Отправлено: {bc.sent_count}
-              {/if}
-              {#if bc.failed_count > 0}
-                &middot; Ошибок: {bc.failed_count}
-              {/if}
-            </div>
-            {#if bc.status === 'draft'}
-              <button
-                class="btn btn-sm btn-primary btn-glow"
-                disabled={sending === bc.id}
-                onclick={() => handleSend(bc)}>
-                {#if sending === bc.id}
-                  <span class="loading loading-spinner loading-sm"></span>
-                  Отправка...
-                {:else}
-                  Отправить
+            <div class="min-w-0 flex-1">
+              <p class="text-[13px] line-clamp-2">{bc.text || '—'}</p>
+              <div class="flex items-center gap-3 mt-1">
+                <span class="text-[11px] text-muted">{formatDateTime(bc.created_at)}</span>
+                <span class="text-[11px] text-muted">Цель: {bc.target || 'all'}</span>
+                {#if bc.sent_count != null}
+                  <span class="text-[11px] text-muted">Отправлено: {bc.sent_count}</span>
                 {/if}
-              </button>
-            {/if}
+              </div>
+            </div>
           </div>
-        </div>
-      {/each}
+        {/each}
+      </div>
     </div>
   {/if}
 </div>
-
-<Modal bind:open={showModal} title="Новая рассылка" size="md">
-  <div class="space-y-4">
-    <div class="form-control">
-      <label class="label"><span class="label-text text-xs font-medium">Заголовок</span></label>
-      <input type="text" bind:value={form.title} class="input input-bordered input-glass" placeholder="Заголовок рассылки" />
-    </div>
-    <div class="form-control">
-      <label class="label"><span class="label-text text-xs font-medium">Текст (HTML)</span></label>
-      <textarea bind:value={form.text} class="textarea textarea-bordered input-glass h-32 font-mono text-sm" placeholder="<b>Привет!</b> Это важное сообщение..."></textarea>
-    </div>
-    <div class="grid grid-cols-2 gap-3">
-      <div class="form-control">
-        <label class="label"><span class="label-text text-xs font-medium">Аудитория</span></label>
-        <select bind:value={form.target} class="select select-bordered input-glass">
-          <option value="all">Все</option>
-          <option value="active">Активные</option>
-          <option value="expired">Истёкшие</option>
-        </select>
-      </div>
-      <div class="form-control">
-        <label class="label"><span class="label-text text-xs font-medium">Формат</span></label>
-        <select bind:value={form.parse_mode} class="select select-bordered input-glass">
-          <option value="HTML">HTML</option>
-          <option value="Markdown">Markdown</option>
-          <option value="MarkdownV2">MarkdownV2</option>
-        </select>
-      </div>
-    </div>
-    <div class="flex gap-3 justify-end pt-2">
-      <button class="btn btn-ghost" onclick={() => showModal = false}>Отмена</button>
-      <button class="btn btn-primary btn-glow" onclick={handleCreate}>Создать черновик</button>
-    </div>
-  </div>
-</Modal>

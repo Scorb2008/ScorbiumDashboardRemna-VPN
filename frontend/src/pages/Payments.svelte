@@ -4,126 +4,92 @@
   import { toasts } from '../lib/stores.js';
   import { formatPrice, formatDateTime } from '../lib/utils.js';
 
+  function formatPaymentMethod(method) {
+    if (!method) return '—';
+    const map = { yookassa: 'ЮKassa', cryptobot: 'CryptoBot', stripe: 'Stripe', manual: 'Ручной' };
+    return map[method] || method;
+  }
+  import Table from '../components/Table.svelte';
+  import Spinner from '../components/Spinner.svelte';
+  import Icon from '../components/Icon.svelte';
+
   let payments = $state([]);
   let loading = $state(true);
-  let statusFilter = $state('');
-  let offset = $state(0);
-  const limit = 50;
+  let search = $state('');
+  let statusFilter = $state('all');
 
   async function loadPayments() {
     loading = true;
-    try {
-      payments = await api.getPayments({ limit, offset, status: statusFilter || undefined });
-    } catch (e) {
-      toasts.error(e.message);
-    } finally {
-      loading = false;
-    }
+    try { payments = await api.getPayments({ limit: 500 }); }
+    catch (e) { toasts.error('Ошибка загрузки: ' + e.message); }
+    finally { loading = false; }
   }
 
-  let initDone = $state(false);
+  onMount(loadPayments);
 
-  onMount(() => { initDone = true; });
-
-  $effect(() => {
-    if (!initDone) return;
-    const _ = statusFilter;
-    offset = 0;
-    loadPayments();
-  });
-
-  async function handleRefund(payment) {
-    try {
-      await api.refundPayment(payment.id);
-      toasts.success('Возврат выполнен');
-      await loadPayments();
-    } catch (e) {
-      toasts.error(e.message);
-    }
-  }
+  let filteredPayments = $derived(
+    payments.filter(p => {
+      const matchSearch = !search ||
+        (p.user_username || '').toLowerCase().includes(search.toLowerCase()) ||
+        (p.user_full_name || '').toLowerCase().includes(search.toLowerCase()) ||
+        String(p.id).includes(search) ||
+        String(p.user_id).includes(search);
+      const matchStatus = statusFilter === 'all' || p.status === statusFilter;
+      return matchSearch && matchStatus;
+    })
+  );
 
   function statusBadge(status) {
-    const map = { succeeded: 'badge-success', pending: 'badge-warning', cancelled: 'badge-ghost', refunded: 'badge-info', failed: 'badge-error' };
-    return map[status] || 'badge-ghost';
+    switch (status) {
+      case 'succeeded': return 'badge-success';
+      case 'pending': return 'badge-warning';
+      case 'canceled': return 'badge-danger';
+      case 'waiting_for_capture': return 'badge-accent';
+      default: return '';
+    }
+  }
+  function statusText(status) {
+    switch (status) {
+      case 'succeeded': return 'Оплачен';
+      case 'pending': return 'Ожидает';
+      case 'canceled': return 'Отменён';
+      case 'waiting_for_capture': return 'Подтверждение';
+      default: return status;
+    }
   }
 
-  function statusLabel(s) {
-    const map = { succeeded: 'Оплачен', pending: 'Ожидает', cancelled: 'Отменён', refunded: 'Возврат', failed: 'Ошибка' };
-    return map[s] || s;
-  }
-
-  function providerLabel(p) {
-    const map = { yookassa: 'YooKassa', yookassa_sbp: 'СБП', cryptobot: 'CryptoBot', freekassa: 'FreeKassa', aikassa: 'AiKassa', platega: 'Platega', paypalych: 'PayPalych', balance: 'Баланс', topup: 'Пополнение', telegram_stars: 'TG Stars' };
-    return map[p] || p;
-  }
+  const columns = [
+    { key: 'id', label: 'ID', sortable: true, render: (r) => `<span class="font-mono text-xs text-zinc-500">#${r.id}</span>` },
+    { key: 'user_id', label: 'Пользователь', sortable: true, render: (r) => `<div><span class="font-medium">${r.user_full_name || '—'}</span><br><span class="text-xs text-muted">${r.user_username ? '@'+r.user_username : 'ID: '+r.user_id}</span></div>` },
+    { key: 'amount', label: 'Сумма', sortable: true, render: (r) => `<span class="font-mono text-xs">${formatPrice(r.amount)}</span>` },
+    { key: 'created_at', label: 'Дата', sortable: true, render: (r) => `<span class="text-xs text-muted">${formatDateTime(r.created_at)}</span>` },
+    { key: 'payment_method', label: 'Способ', sortable: true, render: (r) => `<span class="text-xs">${formatPaymentMethod(r.payment_method)}</span>` },
+    { key: 'plan_name', label: 'Тариф', sortable: true, render: (r) => `<span class="text-xs">${r.plan_name || '—'}</span>` },
+  ];
 </script>
+
+<Spinner {loading} />
 
 <div class="page-enter space-y-5">
   <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
     <div>
-      <h1 class="text-2xl font-bold">Платежи</h1>
-      <p class="text-sm text-base-content/40 mt-1">{payments.length} записей</p>
+      <h1 class="text-[28px] font-bold tracking-tight">Платежи</h1>
+      <p class="text-sm text-muted mt-1">{filteredPayments.length} из {payments.length}</p>
     </div>
-    <div class="flex gap-2">
-      <select bind:value={statusFilter} class="select select-bordered select-sm input-glass">
-        <option value="">Все статусы</option>
+    <div class="flex gap-3 w-full sm:w-auto">
+      <select bind:value={statusFilter} class="select w-full sm:w-40">
+        <option value="all">Все статусы</option>
         <option value="succeeded">Оплачен</option>
         <option value="pending">Ожидает</option>
-        <option value="cancelled">Отменён</option>
-        <option value="refunded">Возврат</option>
-        <option value="failed">Ошибка</option>
+        <option value="canceled">Отменён</option>
       </select>
+      <input type="text" bind:value={search} placeholder="Поиск..." class="input w-full sm:w-60" />
     </div>
   </div>
 
-  {#if loading}
-    <div class="flex justify-center py-12"><span class="loading loading-spinner loading-lg text-primary"></span></div>
-  {:else}
-    <div class="card overflow-hidden">
-      <div class="overflow-x-auto">
-        <table class="table table-zebra">
-          <thead>
-            <tr>
-              <th class="text-xs font-medium uppercase tracking-wider">ID</th>
-              <th class="text-xs font-medium uppercase tracking-wider">Пользователь</th>
-              <th class="text-xs font-medium uppercase tracking-wider">Сумма</th>
-              <th class="text-xs font-medium uppercase tracking-wider">Провайдер</th>
-              <th class="text-xs font-medium uppercase tracking-wider">Статус</th>
-              <th class="text-xs font-medium uppercase tracking-wider">Дата</th>
-              <th class="text-xs font-medium uppercase tracking-wider w-1"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {#if payments.length === 0}
-              <tr><td colspan="7" class="text-center py-12 text-base-content/30">Нет платежей</td></tr>
-            {:else}
-              {#each payments as p, i (p.id)}
-                <tr class="animate-fade-in" style="animation-delay: {i * 15}ms">
-                  <td><span class="font-mono text-xs">#{p.id}</span></td>
-                  <td><span class="text-primary font-mono text-xs">#{p.user_id}</span></td>
-                  <td><span class="font-medium">{formatPrice(p.amount, p.currency)}</span></td>
-                  <td><span class="badge badge-sm badge-outline">{providerLabel(p.provider)}</span></td>
-                  <td><span class="badge badge-sm badge-glow {statusBadge(p.status)}">{statusLabel(p.status)}</span></td>
-                  <td><span class="text-xs text-base-content/50">{formatDateTime(p.created_at)}</span></td>
-                  <td>
-                    {#if p.status === 'succeeded'}
-                      <button class="btn btn-xs btn-warning btn-ghost" onclick={() => handleRefund(p)}>Возврат</button>
-                    {/if}
-                  </td>
-                </tr>
-              {/each}
-            {/if}
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    {#if payments.length >= limit}
-      <div class="flex justify-center gap-2">
-        <button class="btn btn-sm btn-ghost" disabled={offset === 0} onclick={() => { offset -= limit; loadPayments(); }}>Назад</button>
-        <span class="btn btn-sm btn-ghost no-animation">Записи {offset + 1}–{offset + payments.length}</span>
-        <button class="btn btn-sm btn-ghost" disabled={payments.length < limit} onclick={() => { offset += limit; loadPayments(); }}>Далее</button>
-      </div>
-    {/if}
-  {/if}
+  <Table columns={columns} data={filteredPayments}>
+    {#snippet actions(row)}
+      <span class="badge {statusBadge(row.status)}">{statusText(row.status)}</span>
+    {/snippet}
+  </Table>
 </div>
