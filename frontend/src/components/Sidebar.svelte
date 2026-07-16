@@ -3,7 +3,7 @@
   import { api } from '../lib/api.svelte.js';
   import Icon from './Icon.svelte';
 
-  let { currentPath = $bindable('/dashboard') } = $props();
+  let { currentPath = $bindable('/dashboard'), onToggle } = $props();
 
   const groups = [
     {
