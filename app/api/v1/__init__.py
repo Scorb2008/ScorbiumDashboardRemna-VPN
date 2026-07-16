@@ -14,6 +14,9 @@ from .telegram import router as telegram_router
 from .promos import router as promos_router
 from .referrals import router as referrals_router
 from .remnawave import router as remnawave_router
+from .admins import router as admins_router
+from .database import router as database_router
+from .settings import router as settings_router
 
 
 def get_router() -> APIRouter:
@@ -37,5 +40,8 @@ def get_router() -> APIRouter:
     api_router.include_router(referrals_router, prefix="/referrals", tags=["Referrals"])
     api_router.include_router(remnawave_router, prefix="/remnawave", tags=["Remnawave"])
     api_router.include_router(users_router, prefix="/users", tags=["Users"])
+    api_router.include_router(admins_router, prefix="/admins", tags=["Admins"])
+    api_router.include_router(database_router, prefix="/database", tags=["Database"])
+    api_router.include_router(settings_router, prefix="/settings", tags=["Settings"])
 
     return api_router

@@ -9,88 +9,95 @@
     {
       label: '',
       items: [
-        { path: '/dashboard', label: 'Dashboard', icon: 'barChart3' },
+        { path: '/dashboard', label: 'Обзор', icon: 'layout-dashboard' },
       ],
     },
     {
       label: 'Управление',
       items: [
         { path: '/users', label: 'Пользователи', icon: 'users' },
-        { path: '/vpn', label: 'VPN Ключи', icon: 'key' },
-        { path: '/plans', label: 'Тарифы', icon: 'creditCard' },
-        { path: '/payments', label: 'Платежи', icon: 'dollarSign' },
+        { path: '/vpn', label: 'VPN Ключи', icon: 'key-round' },
+        { path: '/plans', label: 'Тарифы', icon: 'ticket' },
+        { path: '/payments', label: 'Платежи', icon: 'wallet' },
       ],
     },
     {
       label: 'Инфраструктура',
       items: [
         { path: '/remnawave', label: 'Remnawave', icon: 'server' },
-        { path: '/telegram', label: 'Telegram Bot', icon: 'phone' },
+        { path: '/telegram', label: 'Telegram', icon: 'bot' },
       ],
     },
     {
       label: 'Маркетинг',
       items: [
-        { path: '/promos', label: 'Промокоды', icon: 'tag' },
-        { path: '/broadcasts', label: 'Рассылки', icon: 'megaphone' },
-        { path: '/referrals', label: 'Рефералы', icon: 'userPlus' },
+        { path: '/promos', label: 'Промокоды', icon: 'percent' },
+        { path: '/broadcasts', label: 'Рассылки', icon: 'send' },
+        { path: '/referrals', label: 'Рефералы', icon: 'git-branch' },
       ],
     },
     {
-      label: '',
+      label: 'Система',
       items: [
-        { path: '/support', label: 'Поддержка', icon: 'lifeBuoy' },
+        { path: '/settings', label: 'Настройки', icon: 'settings' },
+        { path: '/support', label: 'Поддержка', icon: 'headset' },
+        { path: '/database', label: 'База данных', icon: 'database' },
+        { path: '/admins', label: 'Администраторы', icon: 'shield' },
       ],
     },
   ];
 
-  function handleLogout() {
-    api.logout();
+  function navigate(path) {
+    router.navigate(path);
   }
 </script>
 
-<aside class="fixed left-0 top-0 bottom-0 w-[var(--sidebar-width)] bg-surface-0 border-r border-surface-4/40 flex flex-col z-40 select-none">
-  <!-- Logo -->
-  <div class="px-5 h-16 flex items-center gap-3 border-b border-surface-4/40">
-    <div class="w-8 h-8 rounded-[10px] bg-white flex items-center justify-center">
-      <Icon name="zap" size={18} class="text-black" />
+<div class="flex flex-col h-full">
+  <div class="flex items-center gap-3 px-5 py-5 border-b border-[#2a2a35]">
+    <div class="w-8 h-8 rounded-[10px] bg-accent flex items-center justify-center">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/></svg>
     </div>
-    <div class="min-w-0">
-      <span class="text-sm font-semibold text-accent block leading-tight">Scorbium</span>
-      <span class="text-[10px] text-muted uppercase tracking-widest">VPN Dashboard</span>
+    <div>
+      <p class="text-[14px] font-semibold text-text leading-tight">Scorbium</p>
+      <p class="text-[11px] text-muted leading-tight">VPN Dashboard</p>
     </div>
   </div>
 
-  <!-- Navigation -->
-  <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-5">
+  <nav class="flex-1 overflow-y-auto py-3 px-2 space-y-4">
     {#each groups as group}
-      <div>
-        {#if group.label}
-          <p class="px-3 mb-1.5 text-[11px] font-medium text-muted/60 uppercase tracking-wider">{group.label}</p>
-        {/if}
-        <div class="space-y-0.5">
-          {#each group.items as item}
-            {@const active = currentPath === item.path || currentPath.startsWith(item.path + '/')}
-            <a
-              href="#{item.path}"
-              class="flex items-center gap-2.5 px-3 py-[7px] rounded-[10px] text-[13px] font-medium transition-all duration-150
-                {active
-                  ? 'bg-white text-black shadow-sm'
-                  : 'text-muted hover:text-accent hover:bg-surface-3'}">
-              <Icon name={item.icon} size={18} class="{active ? 'text-black' : ''}" />
-              <span>{item.label}</span>
-            </a>
-          {/each}
+      {#if group.label}
+        <div class="px-3 mb-1">
+          <p class="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted">{group.label}</p>
         </div>
+      {/if}
+      <div class="space-y-0.5">
+        {#each group.items as item}
+          {@const active = currentPath === item.path}
+          <button
+            onclick={() => navigate(item.path)}
+            class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] font-medium rounded-[10px] transition-all duration-150
+              {active
+                ? 'bg-accent/10 text-accent hover:bg-accent/15'
+                : 'text-muted hover:text-text hover:bg-surface-2'}">
+            <Icon name={item.icon} size={18} class="flex-shrink-0 {active ? 'text-accent' : 'text-muted'}" />
+            <span>{item.label}</span>
+          </button>
+        {/each}
       </div>
     {/each}
   </nav>
 
-  <!-- Footer -->
-  <div class="px-3 py-3 border-t border-surface-4/40">
-    <button onclick={handleLogout} class="flex items-center gap-2.5 px-3 py-[7px] rounded-[10px] text-[13px] font-medium text-muted hover:text-[#ef4444] hover:bg-[#ef4444]/10 transition-all duration-150 w-full">
-      <Icon name="logout" size={18} />
+  <div class="border-t border-[#2a2a35] p-3">
+    <button
+      onclick={() => { api.logout(); router.navigate('/login'); }}
+      class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] font-medium rounded-[10px] text-muted hover:text-danger hover:bg-danger/5 transition-all duration-150">
+      <Icon name="log-out" size={18} class="flex-shrink-0" />
       <span>Выйти</span>
     </button>
   </div>
-</aside>
+</div>
+
+<style>
+  nav::-webkit-scrollbar { width: 3px; }
+  nav::-webkit-scrollbar-thumb { background: #2f2f39; border-radius: 2px; }
+</style>

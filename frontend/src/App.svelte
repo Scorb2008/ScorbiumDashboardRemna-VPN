@@ -17,6 +17,9 @@
   import Broadcasts from './pages/Broadcasts.svelte';
   import Referrals from './pages/Referrals.svelte';
   import Telegram from './pages/Telegram.svelte';
+  import Settings from './pages/Settings.svelte';
+  import Database from './pages/Database.svelte';
+  import Admins from './pages/Admins.svelte';
 
   let currentPath = $state('/dashboard');
   let authenticated = $state(api.isAuthenticated);
@@ -37,9 +40,11 @@
   <Login />
 {:else}
   <div class="flex h-screen overflow-hidden">
-    <Sidebar bind:currentPath />
-    <main class="flex-1 overflow-y-auto ml-[var(--sidebar-width)]">
-      <div class="p-6 max-w-[1600px]">
+    <div class="fixed left-0 top-0 bottom-0 w-[280px] border-r border-border z-30 bg-bg">
+      <Sidebar bind:currentPath />
+    </div>
+    <main class="flex-1 overflow-y-auto ml-[280px]">
+      <div class="p-6 max-w-[1600px] min-h-screen">
         {#if currentPath === '/dashboard'}
           <Dashboard />
         {:else if currentPath === '/users'}
@@ -62,6 +67,12 @@
           <Referrals />
         {:else if currentPath === '/telegram'}
           <Telegram />
+        {:else if currentPath === '/settings'}
+          <Settings />
+        {:else if currentPath === '/database'}
+          <Database />
+        {:else if currentPath === '/admins'}
+          <Admins />
         {:else}
           <Dashboard />
         {/if}

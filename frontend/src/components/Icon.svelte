@@ -2,6 +2,12 @@
   import { icons } from '../lib/icons.js';
 
   let { name = 'dashboard', size = 20, class: className = '' } = $props();
+
+  function toCamelCase(str) {
+    return str.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+  }
+
+  const iconName = $derived(toCamelCase(name));
 </script>
 
 <svg
@@ -14,5 +20,5 @@
   stroke-width="2"
   stroke-linecap="round"
   stroke-linejoin="round">
-  {@html icons[name] || ''}
+  {@html icons[iconName] || ''}
 </svg>

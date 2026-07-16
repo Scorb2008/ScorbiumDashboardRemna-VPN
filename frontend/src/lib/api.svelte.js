@@ -141,6 +141,29 @@ class ApiClient {
   getReferralStats() { return this.get('/referrals/stats'); }
   getTopReferrers(limit) { return this.get('/referrals/top', { limit }); }
   getUserReferrals(userId) { return this.get(`/referrals/user/${userId}`); }
+
+  // Remnawave
+  getRemnawaveStatus() { return this.get('/remnawave/status'); }
+  getRemnawaveNodes() { return this.get('/remnawave/nodes'); }
+  getRemnawaveUsers() { return this.get('/remnawave/users'); }
+
+  // Admins
+  getAdmins() { return this.get('/admins/'); }
+  getCurrentAdmin() { return this.get('/admins/me'); }
+  createAdmin(data) { return this.post('/admins/', data); }
+  updateAdmin(id, data) { return this.patch(`/admins/${id}`, data); }
+  deleteAdmin(id) { return this.del(`/admins/${id}`); }
+
+  // Database
+  getDatabaseStats() { return this.get('/database/stats'); }
+  exportDatabase(format = 'sql') { return this.get('/database/export', { format }); }
+  clearDatabase() { return this.post('/database/clear'); }
+
+  // Settings
+  getSettings() { return this.get('/settings/'); }
+  updateSettings(data) { return this.patch('/settings/', data); }
+  getPaymentSystems() { return this.get('/settings/payment-systems'); }
+  getAppConfig() { return this.get('/settings/config'); }
 }
 
 export const api = new ApiClient();
