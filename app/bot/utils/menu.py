@@ -188,7 +188,18 @@ async def get_main_menu_kb(
         try:
             parsed_order = json.loads(raw_btn_order)
             if isinstance(parsed_order, list) and all(isinstance(r, list) for r in parsed_order):
-                layout = parsed_order
+                default_map = {}
+                for row in _DEFAULT_LAYOUT:
+                    for b in row:
+                        default_map[b["id"]] = b
+                layout = []
+                for row in parsed_order:
+                    full_row = []
+                    for bid in row:
+                        if bid in default_map:
+                            full_row.append(default_map[bid])
+                    if full_row:
+                        layout.append(full_row)
         except Exception:
             pass
 
