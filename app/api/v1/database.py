@@ -4,7 +4,7 @@ import gzip
 import io
 import subprocess
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,7 +14,6 @@ from app.models.payment import Payment
 from app.models.support import SupportTicket
 from app.models.user import User
 from app.models.vpn_key import VpnKey
-from app.services.bot_settings import reset_bot_settings_cache
 
 router = APIRouter()
 

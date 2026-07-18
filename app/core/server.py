@@ -8,29 +8,15 @@ from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 
 from app.core.config import config
-from app.core.panel_path import is_panel_path
 from app.core.database import AsyncSessionFactory, init_db, close_db
 from app.api.v1 import get_router
-from app.api.panel import get_panel_router
 from app.api.middleware import RateLimitMiddleware
 from app.utils.log import log
 
 _bot = None
 _dp = None
 _bg_tasks = []
-_templates_cache: "Jinja2Templates | None" = None
 
-
-def _get_templates():
-    """Return a cached Jinja2Templates instance."""
-    global _templates_cache
-    if _templates_cache is None:
-        from fastapi.templating import Jinja2Templates
-
-        _templates_cache = Jinja2Templates(
-            directory=str(Path(__file__).resolve().parent.parent / "templates")
-        )
-    return _templates_cache
 _OPENAPI_TAGS = [
     {"name": "Health", "description": "Checking API availability and service status."},
     {"name": "Auth", "description": "Authentication and issuance of access tokens."},
@@ -60,7 +46,6 @@ _OPENAPI_TAGS = [
     },
     {"name": "Promos", "description": "Promo codes, discounts and bonus logic."},
     {"name": "Referrals", "description": "Referral program and invitation statistics."},
-    {"name": "Admin Panel", "description": "HTML/HTMX routes of the admin panel."},
     {
         "name": "Cabinet Auth",
         "description": "Authorization of the user account and Telegram Login Widget.",
@@ -438,55 +423,11 @@ def create_app() -> FastAPI:
         CSRF_COOKIE as _CC,
     )
 
-    class _PanelSessionGuard(_BHM):
-        async def dispatch(self, request: Request, call_next):
-            request.state.panel_admin_info = None
-            request.state.revoked_panel_session = False
-
-            if is_panel_path(request.url.path, config.web.panel_root):
-                token = request.cookies.get("vpn_session", "")
-                if token:
-                    from app.core.permissions import PERMISSIONS
-                    from app.services.token_blacklist import TokenBlacklistService
-                    from app.utils.security import decode_access_token_full
-
-                    info = decode_access_token_full(token)
-                    role = str((info or {}).get("role", "")).strip().lower()
-                    if info and role in PERMISSIONS:
-                        request.state.panel_admin_info = info
-                        jti = str(info.get("jti", "")).strip()
-                        sub = str(info.get("sub", "")).strip()
-                        if jti and sub:
-                            async with AsyncSessionFactory() as session:
-                                revoked = await TokenBlacklistService(
-                                    session
-                                ).is_blacklisted(jti, sub)
-                            if revoked:
-                                request.state.panel_admin_info = None
-                                request.state.revoked_panel_session = True
-
-            response = await call_next(request)
-            if getattr(request.state, "revoked_panel_session", False):
-                response.delete_cookie(
-                    "vpn_session",
-                    path="/",
-                    secure=_is_secure_request(request),
-                    httponly=True,
-                    samesite="lax",
-                )
-            return response
-
-    app.add_middleware(_PanelSessionGuard)
-
     class _CSRFInjector(_BHM):
         async def dispatch(self, request: Request, call_next):
             resp = await call_next(request)
             path = request.url.path
-            is_html_panel = is_panel_path(
-                path, config.web.panel_root
-            ) and not path.startswith(f"{config.web.panel_prefix}/api")
-            is_html_cabinet = path.startswith("/cabinet")
-            if is_html_panel or is_html_cabinet:
+            if path.startswith("/cabinet"):
                 if not request.cookies.get(_CC):
                     token = _gct()
                     resp.set_cookie(
@@ -512,16 +453,18 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(403)
     async def _forbidden_exc(request: Request, exc: Exception):
-        tpl = _get_templates()
-        return tpl.TemplateResponse(
-            request,
-            "forbidden.html",
-            {
-                "request": request,
-                "app_name": config.web.app_name,
-                "app_version": config.web.app_version,
-                "panel_root": config.web.panel_root,
-            },
+        from fastapi.responses import HTMLResponse
+
+        return HTMLResponse(
+            content=(
+                "<!DOCTYPE html><html><head><title>403</title></head>"
+                "<body style='background:#070b14;color:#f1f5f9;display:flex;"
+                "align-items:center;justify-content:center;min-height:100vh;"
+                "font-family:system-ui'><div style='text-align:center'>"
+                "<h1>403 Forbidden</h1><p>Недостаточно прав.</p>"
+                f"<a href='{config.web.panel_root}' style='color:#00d4aa'>"
+                "Вернуться на дашборд</a></div></body></html>"
+            ),
             status_code=403,
         )
 
@@ -532,15 +475,12 @@ def create_app() -> FastAPI:
             resp.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
 
             path = request.url.path
-            is_panel = is_panel_path(path, config.web.panel_root)
             is_cabinet = path.startswith("/cabinet")
             is_docs = path in ("/docs", "/redoc", "/openapi.json")
 
             if is_cabinet:
                 if "X-Frame-Options" in resp.headers:
                     del resp.headers["X-Frame-Options"]
-            elif is_panel:
-                resp.headers["X-Frame-Options"] = "SAMEORIGIN"
             else:
                 resp.headers["X-Frame-Options"] = "DENY"
 
@@ -581,19 +521,6 @@ def create_app() -> FastAPI:
                     "base-uri 'self'; "
                     "form-action 'self'"
                 )
-            elif is_panel:
-                resp.headers["Content-Security-Policy"] = (
-                    "default-src 'self'; "
-                    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; "
-                    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; "
-                    "font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; "
-                    "img-src 'self' data:; "
-                    "connect-src 'self' ws: wss:; "
-                    "frame-src 'none'; "
-                    "object-src 'none'; "
-                    "base-uri 'self'; "
-                    "form-action 'self'"
-                )
             if "server" in resp.headers:
                 del resp.headers["server"]
 
@@ -613,7 +540,6 @@ def create_app() -> FastAPI:
     app.add_middleware(PrometheusMiddleware)
 
     app.include_router(get_router())
-    app.include_router(get_panel_router())
     from app.api.cabinet import get_cabinet_router
 
     app.include_router(get_cabinet_router())
@@ -699,10 +625,11 @@ def create_app() -> FastAPI:
     @app.get("/metrics-dashboard", include_in_schema=False)
     async def metrics_dashboard_page(request: Request):
         """Serve the HTML dashboard page."""
-        templates = _get_templates()
-        return templates.TemplateResponse(
-            request, "metrics/dashboard.html", {"request": request}
-        )
+        from fastapi.responses import HTMLResponse
+        from pathlib import Path as _P
+
+        tpl_file = _P(__file__).resolve().parent.parent / "templates" / "metrics" / "dashboard.html"
+        return HTMLResponse(content=tpl_file.read_text(encoding="utf-8"))
 
     @app.post(config.telegram.telegram_webhook_path, include_in_schema=False)
     async def telegram_webhook(request: Request):
