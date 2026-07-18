@@ -26,7 +26,7 @@ from app.services.referral import ReferralService
 from app.services.broadcast import BroadcastService
 from app.services.plan import PlanService
 from app.services.remnawave.remnawave_api import get_vpn_panel
-from app.services.bot_settings import BotSettingsService, parse_int_list_setting
+from app.services.bot_settings import BotSettingsService
 from app.models.payment import PaymentStatus, PaymentType
 from app.bot.utils.media import resolve_photo_input
 from app.bot.utils.subscription_links import subscription_link_kb
@@ -562,7 +562,7 @@ async def _show_admin_key_hwids(
         pass
 
 
-async def _show_squads(callback: CallbackQuery, saved_ids: list[int]) -> None:
+async def _show_squads(callback: CallbackQuery, saved_ids: list[str]) -> None:
     from app.services.remnawave.remnawave_api import RemnawaveService
 
     try:
@@ -587,20 +587,21 @@ async def _show_squads(callback: CallbackQuery, saved_ids: list[int]) -> None:
     ]
     builder = InlineKeyboardBuilder()
     for g in groups:
-        gid = g["id"]
-        icon = "✅" if gid in saved_ids else "⬜"
+        gid = g.get("uuid") or g.get("id", "")
+        gid_str = str(gid)
+        icon = "✅" if gid_str in saved_ids else "⬜"
         disabled = " 🔴" if g.get("is_disabled") else ""
         builder.row(
             InlineKeyboardButton(
-                text=f"{icon} {g['name']}{disabled} ({g.get('total_users', 0)} юз.)",
-                callback_data=f"adm:squad:toggle:{gid}",
+                text=f"{icon} {g.get('name', gid_str)}{disabled} ({g.get('total_users', 0)} юз.)",
+                callback_data=f"adm:squad:toggle:{gid_str}",
             )
         )
         inbounds = ", ".join(g.get("inbound_tags", []))
-        lines.append(f"{icon} <b>{g['name']}</b> — {inbounds}")
+        lines.append(f"{icon} <b>{g.get('name', gid_str)}</b> — {inbounds}")
 
     lines.append(
-        f"\n💾 Активные: <code>{saved_ids}</code>"
+        f"\n💾 Активные: <code>{len(saved_ids)}</code>"
         if saved_ids
         else "\n⚠️ Сквады не выбраны"
     )
@@ -3525,10 +3526,11 @@ async def admin_squads(callback: CallbackQuery) -> None:
     async with AsyncSessionFactory() as session:
         saved_raw = await BotSettingsService(session).get("vpn_squad_ids")
 
-    saved_ids: list[int] = []
+    saved_ids: list[str] = []
     try:
         if saved_raw:
-            saved_ids = parse_int_list_setting(saved_raw)
+            from app.services.bot_settings import parse_str_list_setting
+            saved_ids = parse_str_list_setting(saved_raw)
     except Exception:
         pass
 
@@ -3567,15 +3569,16 @@ async def admin_squad_toggle(callback: CallbackQuery) -> None:
     if not _is_admin(callback.from_user.id):
         return
 
-    gid = int(callback.data.split(":")[3])
+    gid = callback.data.split(":", 3)[3]
 
     async with AsyncSessionFactory() as session:
         svc = BotSettingsService(session)
         saved_raw = await svc.get("vpn_squad_ids")
-        saved_ids: list[int] = []
+        saved_ids: list[str] = []
         try:
             if saved_raw:
-                saved_ids = parse_int_list_setting(saved_raw)
+                from app.services.bot_settings import parse_str_list_setting
+                saved_ids = parse_str_list_setting(saved_raw)
         except Exception:
             pass
 
@@ -3589,7 +3592,7 @@ async def admin_squad_toggle(callback: CallbackQuery) -> None:
         await svc.set("vpn_squad_ids", _json.dumps(saved_ids))
         await session.commit()
 
-    await callback.answer(f"Сквада {gid} {action}", show_alert=False)
+    await callback.answer(f"Сквада {gid[:8]}... {action}", show_alert=False)
     await _show_squads(callback, saved_ids)
 
 

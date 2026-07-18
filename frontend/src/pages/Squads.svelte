@@ -19,7 +19,8 @@
         api.getVpnSquads(),
         api.getSelectedVpnSquads(),
       ]);
-      squads = squadsData?.squads || [];
+      squads = squadsData?.squads || squadsData || [];
+      if (!Array.isArray(squads)) squads = [];
       selectedIds = selectedData?.squad_ids || [];
     } catch (e) {
       fetchError = e.message;
@@ -115,7 +116,7 @@
 
       <div class="space-y-1.5">
         {#each squads as g}
-          {@const gid = g.id}
+          {@const gid = g.uuid || g.id}
           {@const checked = selectedIds.includes(gid)}
           <button
             onclick={() => toggleSquad(gid)}
@@ -131,7 +132,7 @@
             </div>
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2">
-                <span class="text-[13px] font-medium">{g.name || `Squad #${gid}`}</span>
+                <span class="text-[13px] font-medium">{g.name || g.title || `Squad #${gid}`}</span>
                 {#if g.is_disabled}
                   <span class="text-[10px] font-medium px-1.5 py-0.5 rounded bg-danger/20 text-danger">Отключена</span>
                 {/if}

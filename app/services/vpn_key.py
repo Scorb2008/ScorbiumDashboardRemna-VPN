@@ -308,23 +308,23 @@ class VpnKeyService:
         return None
 
     async def _assign_vpn_squads(self, panel_user: dict) -> None:
-        from app.services.bot_settings import BotSettingsService, parse_int_list_setting
+        from app.services.bot_settings import BotSettingsService, parse_str_list_setting
 
         async with AsyncSessionFactory() as settings_session:
             raw = await BotSettingsService(settings_session).get("vpn_squad_ids")
-        group_ids = parse_int_list_setting(raw) if raw else []
+        squad_uuids = parse_str_list_setting(raw) if raw else []
 
-        if not group_ids:
+        if not squad_uuids:
             try:
-                all_groups = await self._get_panel().get_groups()
-                if all_groups:
-                    first = all_groups[0]
-                    gid = first.get("id")
-                    if gid is not None:
-                        group_ids = [gid]
+                all_squads = await self._get_panel().get_groups()
+                if all_squads:
+                    first = all_squads[0]
+                    sid = first.get("uuid") or first.get("id")
+                    if sid is not None:
+                        squad_uuids = [str(sid)]
                         log.info(
                             f"[_assign_vpn_squads] no squads selected, "
-                            f"using first available: {gid}"
+                            f"using first available: {sid}"
                         )
                 else:
                     log.warning(
@@ -344,10 +344,10 @@ class VpnKeyService:
             )
             return
 
-        result = await self._get_panel().assign_groups(user_uuid, group_ids)
+        result = await self._get_panel().assign_groups(user_uuid, squad_uuids)
         if result is not None:
             log.info(
-                f"[_assign_vpn_squads] assigned squads {group_ids} to {user_uuid}"
+                f"[_assign_vpn_squads] assigned squads {squad_uuids} to {user_uuid}"
             )
 
     def _set_access_url(self, key: VpnKey, panel_user: dict) -> None:

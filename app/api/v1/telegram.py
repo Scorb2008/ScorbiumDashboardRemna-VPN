@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, status
 from pydantic import BaseModel
 
 from app.api.dependencies import get_current_admin, get_db
-from app.services.bot_settings import BotSettingsService, parse_int_list_setting
+from app.services.bot_settings import BotSettingsService, parse_str_list_setting
 from app.services.telegram_notify import TelegramNotifyService
 
 
@@ -206,7 +206,7 @@ async def refresh_webhook(
 
 
 class SaveSquadsBody(BaseModel):
-    squad_ids: list[int] = []
+    squad_ids: list[str] = []
 
 
 @router.get("/squads", summary="List Remnawave VPN squads")
@@ -225,14 +225,14 @@ async def list_squads(
     return {"squads": groups}
 
 
-@router.get("/squads/selected", summary="Get selected VPN squad IDs")
+@router.get("/squads/selected", summary="Get selected VPN squad UUIDs")
 async def get_selected_squads(
     db=Depends(get_db),
     _: str = Depends(get_current_admin),
 ) -> dict:
     svc = BotSettingsService(db)
     raw = await svc.get("vpn_squad_ids")
-    return {"squad_ids": parse_int_list_setting(raw) if raw else []}
+    return {"squad_ids": parse_str_list_setting(raw) if raw else []}
 
 
 @router.post("/squads/selected", summary="Save selected VPN squad IDs")

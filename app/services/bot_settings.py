@@ -172,6 +172,26 @@ def parse_int_list_setting(raw: str | None) -> list[int]:
     return result
 
 
+def parse_str_list_setting(raw: str | None) -> list[str]:
+    if not raw:
+        return []
+
+    value = raw.strip()
+    if not value or value == "[]":
+        return []
+
+    try:
+        parsed = json.loads(value)
+    except Exception:
+        parsed = None
+
+    if isinstance(parsed, list):
+        return [str(item).strip() for item in parsed if str(item).strip()]
+    if isinstance(parsed, str):
+        return [s.strip() for s in parsed.split(",") if s.strip()]
+    return [s.strip() for s in value.split(",") if s.strip()]
+
+
 class BotSettingsService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
