@@ -127,7 +127,10 @@ async def cmd_status(message: Message) -> None:
 
 @router.callback_query(F.data == "status_cmd")
 async def cb_status(callback: CallbackQuery) -> None:
-    await callback.answer()
+    try:
+        await callback.answer()
+    except Exception:
+        pass
     await cmd_status(callback.message)
 
 
@@ -210,7 +213,10 @@ async def cmd_payments(message: Message) -> None:
 
 @router.callback_query(F.data == "payments_cmd")
 async def cb_payments(callback: CallbackQuery) -> None:
-    await callback.answer()
+    try:
+        await callback.answer()
+    except Exception:
+        pass
     await cmd_payments(callback.message)
 
 
@@ -393,15 +399,16 @@ async def gift_select_plan(callback: CallbackQuery) -> None:
             )
     builder.row(InlineKeyboardButton(text="◀️ Отмена", callback_data="back_main"))
 
+    from app.bot.utils.media import edit_with_photo
+    await edit_with_photo(
+        callback,
+        f"🎁 Подарок для @{target_username}\n💰 Ваш баланс: {balance:.2f} ₽\n\nВыберите тариф:",
+        reply_markup=builder.as_markup(),
+    )
     try:
-        await callback.message.edit_text(
-            f"🎁 Подарок для @{target_username}\n💰 Ваш баланс: {balance:.2f} ₽\n\nВыберите тариф:",
-            reply_markup=builder.as_markup(),
-            parse_mode="HTML",
-        )
+        await callback.answer()
     except Exception:
         pass
-    await callback.answer()
 
 
 @router.callback_query(F.data.startswith("gift:buy:"))
@@ -417,21 +424,30 @@ async def gift_buy(callback: CallbackQuery) -> None:
 
         plan = await PlanService(session).get_by_id(plan_id)
         if not plan:
-            await callback.answer("Тариф не найден", show_alert=True)
+            try:
+                await callback.answer("Тариф не найден", show_alert=True)
+            except Exception:
+                pass
             return
 
         sender = await UserService(session).deduct_balance(
             callback.from_user.id, plan.price
         )
         if not sender:
-            await callback.answer("❌ Недостаточно средств на балансе", show_alert=True)
+            try:
+                await callback.answer("❌ Недостаточно средств на балансе", show_alert=True)
+            except Exception:
+                pass
             return
 
         key = await VpnKeyService(session).provision(user_id=target_id, plan=plan)
 
         if not key:
             await session.rollback()
-            await callback.answer("❌ Ошибка создания ключа", show_alert=True)
+            try:
+                await callback.answer("❌ Ошибка создания ключа", show_alert=True)
+            except Exception:
+                pass
             return
 
         await session.commit()
@@ -456,20 +472,25 @@ async def gift_buy(callback: CallbackQuery) -> None:
                 lang="ru",
             ).model_dump(exclude_none=True),
         )
+        from app.bot.utils.media import edit_with_photo
+        await edit_with_photo(
+            callback,
+            f"✅ <b>Подарок отправлен!</b>\n\n"
+            f"Получатель: {target_name}\n"
+            f"Тариф: <b>{escape_html(plan.name)}</b>\n"
+            f"Списано: <b>{plan.price} ₽</b>",
+        )
+    else:
         try:
-            await callback.message.edit_text(
-                f"✅ <b>Подарок отправлен!</b>\n\n"
-                f"Получатель: {target_name}\n"
-                f"Тариф: <b>{escape_html(plan.name)}</b>\n"
-                f"Списано: <b>{plan.price} ₽</b>",
-                parse_mode="HTML",
-            )
+            await callback.answer("❌ Ошибка создания ключа", show_alert=True)
         except Exception:
             pass
-    else:
-        await callback.answer("❌ Ошибка создания ключа", show_alert=True)
+        return
 
-    await callback.answer()
+    try:
+        await callback.answer()
+    except Exception:
+        pass
 
 
 # ── Автопродление ─────────────────────────────────────────────────────────────
@@ -513,12 +534,13 @@ async def cmd_autorenew(message: Message) -> None:
 
 @router.callback_query(F.data == "top_referrers")
 async def cb_top(callback: CallbackQuery) -> None:
-    await callback.answer()
-    text = await _build_top_text(callback.from_user.id)
     try:
-        await callback.message.edit_text(text, parse_mode="HTML")
+        await callback.answer()
     except Exception:
-        await callback.message.answer(text, parse_mode="HTML")
+        pass
+    text = await _build_top_text(callback.from_user.id)
+    from app.bot.utils.media import edit_with_photo
+    await edit_with_photo(callback, text)
 
 
 # ── Серверы ───────────────────────────────────────────────────────────────────
@@ -526,7 +548,10 @@ async def cb_top(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "servers")
 async def cb_servers(callback: CallbackQuery) -> None:
-    await callback.answer()
+    try:
+        await callback.answer()
+    except Exception:
+        pass
 
     async with AsyncSessionFactory() as session:
         from app.services.i18n import get_lang

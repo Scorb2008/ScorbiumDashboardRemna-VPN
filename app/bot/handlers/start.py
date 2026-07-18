@@ -34,6 +34,16 @@ async def _safe_answer(callback: CallbackQuery) -> None:
         pass
 
 
+async def _safe_answer_text(
+    callback: CallbackQuery, text: str = "", show_alert: bool = False
+) -> None:
+    """Safely answer callback query with text/alert, ignoring errors."""
+    try:
+        await callback.answer(text[:200] if text else "", show_alert=show_alert)
+    except Exception:
+        pass
+
+
 def _message_text_or_none(message: Message) -> str | None:
     text = (message.text or "").strip()
     return text or None
@@ -165,6 +175,12 @@ async def back_to_main(callback: CallbackQuery, state: FSMContext) -> None:
 
 @router.callback_query(F.data == "balance")
 async def show_balance(callback: CallbackQuery) -> None:
+    await _update_balance_screen(callback)
+    await _safe_answer(callback)
+
+
+async def _update_balance_screen(callback: CallbackQuery) -> None:
+    """Обновляет экран баланса без вызова callback.answer()."""
     async with AsyncSessionFactory() as session:
         user = await UserService(session).get_by_id(callback.from_user.id)
         ref_count = await ReferralService(session).count_referrals(
@@ -231,7 +247,6 @@ async def show_balance(callback: CallbackQuery) -> None:
     from app.bot.utils.media import edit_with_photo
 
     await edit_with_photo(callback, text, reply_markup=builder.as_markup(), photo=photo)
-    await _safe_answer(callback)
 
 
 # ── Автосписание ──────────────────────────────────────────────────────────────
@@ -248,9 +263,9 @@ async def toggle_autorenew(callback: CallbackQuery) -> None:
         lang = await _get_lang_from_session(callback.from_user.id, session)
 
     msg = t("autorenew_enabled", lang) if enabled else t("autorenew_disabled", lang)
-    await callback.answer(msg[:200], show_alert=True)
-    # Обновляем экран баланса
-    await show_balance(callback)
+    await _safe_answer_text(callback, msg, show_alert=True)
+    # Обновляем экран баланса (без повторного answer)
+    await _update_balance_screen(callback)
 
 
 # ── TOPUP_BALANCE_AMOUNT ────────────────────────────────────────────────────────

@@ -18,6 +18,16 @@ from app.utils.html_utils import escape_html, html_code
 
 router = Router()
 
+
+async def _safe_cb_answer(
+    callback: CallbackQuery, text: str = "", show_alert: bool = False
+) -> None:
+    """Safely answer callback query — never crashes."""
+    try:
+        await callback.answer(text[:200] if text else "", show_alert=show_alert)
+    except Exception:
+        pass
+
 CONNECT_GUIDES = {
     "ios": (
         "📱 <b>Подключение на iOS</b>\n\n"
@@ -193,7 +203,7 @@ async def show_my_keys(callback: CallbackQuery) -> None:
             )
         except Exception:
             pass
-        await callback.answer()
+        await _safe_cb_answer(callback)
         return
 
     builder = InlineKeyboardBuilder()
@@ -238,7 +248,7 @@ async def show_my_keys(callback: CallbackQuery) -> None:
         )
     except Exception:
         pass
-    await callback.answer()
+    await _safe_cb_answer(callback)
 
 
 # ── Архив ─────────────────────────────────────────────────────────────────────
@@ -267,7 +277,7 @@ async def show_archive(callback: CallbackQuery) -> None:
                 )
 
     if not archive_rows:
-        await callback.answer(t("archive_empty_alert", lang), show_alert=True)
+        await _safe_cb_answer(callback, t("archive_empty_alert", lang), show_alert=True)
         return
 
     builder = InlineKeyboardBuilder()
@@ -292,7 +302,7 @@ async def show_archive(callback: CallbackQuery) -> None:
         )
     except Exception:
         pass
-    await callback.answer()
+    await _safe_cb_answer(callback)
 
 
 # ── Детали ────────────────────────────────────────────────────────────────────
@@ -306,7 +316,7 @@ async def show_key_detail(callback: CallbackQuery) -> None:
         lang = await _get_lang(callback.from_user.id, session)
         key = await VpnKeyService(session).get_by_id(key_id)
         if not key or key.user_id != callback.from_user.id:
-            await callback.answer(t("sub_not_found", lang), show_alert=True)
+            await _safe_cb_answer(callback, t("sub_not_found", lang), show_alert=True)
             return
 
         status_val = (
@@ -372,7 +382,7 @@ async def show_key_detail(callback: CallbackQuery) -> None:
         await edit_with_photo(callback, text, reply_markup=builder.as_markup())
     except Exception:
         pass
-    await callback.answer()
+    await _safe_cb_answer(callback)
 
 
 @router.callback_query(F.data.startswith("key:devices:"))
@@ -383,7 +393,7 @@ async def show_key_devices(callback: CallbackQuery) -> None:
         lang = await _get_lang(callback.from_user.id, session)
         key = await VpnKeyService(session).get_by_id(key_id)
         if not key or key.user_id != callback.from_user.id:
-            await callback.answer(t("sub_not_found", lang), show_alert=True)
+            await _safe_cb_answer(callback, t("sub_not_found", lang), show_alert=True)
             return
 
         plan_name = key.plan.name if key.plan else key.name or f"Подписка #{key.id}"
@@ -418,7 +428,7 @@ async def show_key_devices(callback: CallbackQuery) -> None:
         await edit_with_photo(callback, text, reply_markup=builder.as_markup())
     except Exception:
         pass
-    await callback.answer()
+    await _safe_cb_answer(callback)
 
 
 # ── О проекте ─────────────────────────────────────────────────────────────────
@@ -457,7 +467,7 @@ async def about_project(callback: CallbackQuery) -> None:
         )
     except Exception:
         pass
-    await callback.answer()
+    await _safe_cb_answer(callback)
 
 
 # ── Как подключить ────────────────────────────────────────────────────────────
@@ -492,7 +502,7 @@ async def connect_menu(callback: CallbackQuery) -> None:
         )
     except Exception:
         pass
-    await callback.answer()
+    await _safe_cb_answer(callback)
 
 
 @router.callback_query(F.data.startswith("connect:"))
@@ -507,7 +517,7 @@ async def connect_guide(callback: CallbackQuery) -> None:
 
     guide = CONNECT_GUIDES.get(platform)
     if not guide:
-        await callback.answer(t("connect_not_found", lang), show_alert=True)
+        await _safe_cb_answer(callback, t("connect_not_found", lang), show_alert=True)
         return
 
     builder = InlineKeyboardBuilder()
@@ -526,7 +536,7 @@ async def connect_guide(callback: CallbackQuery) -> None:
         )
     except Exception:
         pass
-    await callback.answer()
+    await _safe_cb_answer(callback)
 
 
 # ── Продление подписки ───────────────────────────────────────────────────
@@ -543,14 +553,14 @@ async def extend_key(callback: CallbackQuery) -> None:
         lang = await _get_lang(callback.from_user.id, session)
         key = await VpnKeyService(session).get_by_id(key_id)
         if not key or key.user_id != callback.from_user.id:
-            await callback.answer(t("sub_not_found", lang), show_alert=True)
+            await _safe_cb_answer(callback, t("sub_not_found", lang), show_alert=True)
             return
 
         status_val = (
             key.status.value if hasattr(key.status, "value") else str(key.status)
         )
         if status_val not in ("active", "expired"):
-            await callback.answer("Подписка недоступна для продления", show_alert=True)
+            await _safe_cb_answer(callback, "Подписка недоступна для продления", show_alert=True)
             return
 
         plans = await PlanService(session).get_all(only_active=True)
@@ -558,7 +568,7 @@ async def extend_key(callback: CallbackQuery) -> None:
         balance = float(user.balance or 0) if user else 0
 
     if not plans:
-        await callback.answer("Нет доступных тарифов", show_alert=True)
+        await _safe_cb_answer(callback, "Нет доступных тарифов", show_alert=True)
         return
 
     builder = InlineKeyboardBuilder()
@@ -598,7 +608,7 @@ async def extend_key(callback: CallbackQuery) -> None:
         await edit_with_photo(callback, text, reply_markup=builder.as_markup())
     except Exception:
         pass
-    await callback.answer()
+    await _safe_cb_answer(callback)
 
 
 @router.callback_query(F.data.startswith("extend:methods:"))
@@ -619,7 +629,7 @@ async def extend_choose_method(callback: CallbackQuery) -> None:
         balance = float(user.balance or 0) if user else 0
 
         if not plan:
-            await callback.answer("Тариф не найден", show_alert=True)
+            await _safe_cb_answer(callback, "Тариф не найден", show_alert=True)
             return
 
         _yk_toggle = (await svc.get("ps_yookassa_enabled") or "0") == "1"
@@ -714,7 +724,7 @@ async def extend_choose_method(callback: CallbackQuery) -> None:
         )
     except Exception:
         pass
-    await callback.answer()
+    await _safe_cb_answer(callback)
 
 
 @router.callback_query(F.data.startswith("extend:yookassa:"))
@@ -731,7 +741,7 @@ async def extend_yookassa(callback: CallbackQuery, bot) -> None:
 
         plan = await PlanService(session).get_by_id(plan_id)
         if not plan:
-            await callback.answer("Тариф не найден", show_alert=True)
+            await _safe_cb_answer(callback, "Тариф не найден", show_alert=True)
             return
 
         yk = await YookassaService.create()
@@ -787,7 +797,7 @@ async def extend_yookassa(callback: CallbackQuery, bot) -> None:
         )
     except Exception:
         pass
-    await callback.answer()
+    await _safe_cb_answer(callback)
 
 
 @router.callback_query(F.data.startswith("extend:sbp:"))
@@ -804,7 +814,7 @@ async def extend_sbp(callback: CallbackQuery, bot) -> None:
 
         plan = await PlanService(session).get_by_id(plan_id)
         if not plan:
-            await callback.answer("Тариф не найден", show_alert=True)
+            await _safe_cb_answer(callback, "Тариф не найден", show_alert=True)
             return
 
         yk = await YookassaService.create()
@@ -860,7 +870,7 @@ async def extend_sbp(callback: CallbackQuery, bot) -> None:
         )
     except Exception:
         pass
-    await callback.answer()
+    await _safe_cb_answer(callback)
 
 
 @router.callback_query(F.data.startswith("extend:stars:"))
@@ -877,7 +887,7 @@ async def extend_stars(callback: CallbackQuery, bot) -> None:
 
         plan = await PlanService(session).get_by_id(plan_id)
         if not plan:
-            await callback.answer("Тариф не найден", show_alert=True)
+            await _safe_cb_answer(callback, "Тариф не найден", show_alert=True)
             return
 
         stars = TelegramStarsService.rub_to_stars(
@@ -916,10 +926,10 @@ async def extend_stars(callback: CallbackQuery, bot) -> None:
                 .as_markup(),
             )
         else:
-            await callback.answer("Ошибка создания инвойса", show_alert=True)
+            await _safe_cb_answer(callback, "Ошибка создания инвойса", show_alert=True)
     except Exception:
         pass
-    await callback.answer()
+    await _safe_cb_answer(callback)
 
 
 @router.callback_query(F.data.startswith("extend:crypto:"))
@@ -938,12 +948,12 @@ async def extend_crypto(callback: CallbackQuery, bot) -> None:
         plan = await PlanService(session).get_by_id(plan_id)
         settings = await BotSettingsService(session).get_all()
         if not plan:
-            await callback.answer("Тариф не найден", show_alert=True)
+            await _safe_cb_answer(callback, "Тариф не найден", show_alert=True)
             return
 
         crypto = CryptoBotService.from_settings(settings)
         if not crypto:
-            await callback.answer("CryptoBot не настроен", show_alert=True)
+            await _safe_cb_answer(callback, "CryptoBot не настроен", show_alert=True)
             return
 
         usdt_amount = await crypto.rub_to_usdt(float(plan.price))
@@ -963,7 +973,7 @@ async def extend_crypto(callback: CallbackQuery, bot) -> None:
         )
         if not invoice:
             await session.rollback()
-            await callback.answer("Ошибка создания инвойса", show_alert=True)
+            await _safe_cb_answer(callback, "Ошибка создания инвойса", show_alert=True)
             return
 
         payment.external_id = str(invoice["invoice_id"])
@@ -993,7 +1003,7 @@ async def extend_crypto(callback: CallbackQuery, bot) -> None:
         )
     except Exception:
         pass
-    await callback.answer()
+    await _safe_cb_answer(callback)
 
 
 @router.callback_query(F.data.startswith("extend:freekassa:"))
@@ -1012,12 +1022,12 @@ async def extend_freekassa(callback: CallbackQuery, bot) -> None:
         plan = await PlanService(session).get_by_id(plan_id)
         settings = await BotSettingsService(session).get_all()
         if not plan:
-            await callback.answer("Тариф не найден", show_alert=True)
+            await _safe_cb_answer(callback, "Тариф не найден", show_alert=True)
             return
 
         fk = FreeKassaService.from_settings(settings)
         if not fk:
-            await callback.answer("FreeKassa не настроен", show_alert=True)
+            await _safe_cb_answer(callback, "FreeKassa не настроен", show_alert=True)
             return
 
         payment = await PaymentService(session).create_pending(
@@ -1064,7 +1074,7 @@ async def extend_freekassa(callback: CallbackQuery, bot) -> None:
         )
     except Exception:
         pass
-    await callback.answer()
+    await _safe_cb_answer(callback)
 
 
 @router.callback_query(F.data.startswith("extend:platega:"))
@@ -1083,12 +1093,12 @@ async def extend_platega(callback: CallbackQuery, bot) -> None:
         plan = await PlanService(session).get_by_id(plan_id)
         settings = await BotSettingsService(session).get_all()
         if not plan:
-            await callback.answer("Тариф не найден", show_alert=True)
+            await _safe_cb_answer(callback, "Тариф не найден", show_alert=True)
             return
 
         platega = PlategaService.from_settings(settings)
         if not platega:
-            await callback.answer("Platega не настроен", show_alert=True)
+            await _safe_cb_answer(callback, "Platega не настроен", show_alert=True)
             return
 
         payment = await PaymentService(session).create_pending(
@@ -1114,7 +1124,7 @@ async def extend_platega(callback: CallbackQuery, bot) -> None:
         )
         if not transaction.get("ok") or not transaction.get("url"):
             await session.rollback()
-            await callback.answer("Ошибка создания платежа", show_alert=True)
+            await _safe_cb_answer(callback, "Ошибка создания платежа", show_alert=True)
             return
 
         payment.external_id = str(transaction.get("transaction_id") or "")
@@ -1144,7 +1154,7 @@ async def extend_platega(callback: CallbackQuery, bot) -> None:
         )
     except Exception:
         pass
-    await callback.answer()
+    await _safe_cb_answer(callback)
 
 
 @router.callback_query(F.data.startswith("extend:check:fk:"))
@@ -1162,11 +1172,11 @@ async def extend_check_fk(callback: CallbackQuery, bot) -> None:
         lang = await _get_lang(callback.from_user.id, session)
         payment = await PaymentService(session).get_by_id(payment_id)
         if not payment or payment.user_id != callback.from_user.id:
-            await callback.answer("Платёж не найден", show_alert=True)
+            await _safe_cb_answer(callback, "Платёж не найден", show_alert=True)
             return
 
         if payment.status == PaymentStatus.SUCCEEDED.value and payment.vpn_key_id:
-            await callback.answer(
+            await _safe_cb_answer(callback, 
                 _extension_already_applied_text(lang), show_alert=True
             )
             return
@@ -1174,7 +1184,7 @@ async def extend_check_fk(callback: CallbackQuery, bot) -> None:
         settings = await BotSettingsService(session).get_all()
         fk = FreeKassaService.from_settings(settings)
         if not fk:
-            await callback.answer("Ошибка", show_alert=True)
+            await _safe_cb_answer(callback, "Ошибка", show_alert=True)
             return
 
         if payment.external_id:
@@ -1190,14 +1200,14 @@ async def extend_check_fk(callback: CallbackQuery, bot) -> None:
                         payment.external_id,
                     )
                     if exp:
-                        await callback.answer(f"Продлено до {exp}!", show_alert=True)
+                        await _safe_cb_answer(callback, f"Продлено до {exp}!", show_alert=True)
                     else:
-                        await callback.answer("Ошибка продления", show_alert=True)
+                        await _safe_cb_answer(callback, "Ошибка продления", show_alert=True)
                 else:
-                    await callback.answer("Ожидание оплаты...", show_alert=True)
+                    await _safe_cb_answer(callback, "Ожидание оплаты...", show_alert=True)
             else:
-                await callback.answer("Ожидание оплаты...", show_alert=True)
-    await callback.answer()
+                await _safe_cb_answer(callback, "Ожидание оплаты...", show_alert=True)
+    await _safe_cb_answer(callback)
 
 
 @router.callback_query(F.data.startswith("extend:check:platega:"))
@@ -1215,11 +1225,11 @@ async def extend_check_platega(callback: CallbackQuery, bot) -> None:
         lang = await _get_lang(callback.from_user.id, session)
         payment = await PaymentService(session).get_by_id(payment_id)
         if not payment or payment.user_id != callback.from_user.id:
-            await callback.answer("Платёж не найден", show_alert=True)
+            await _safe_cb_answer(callback, "Платёж не найден", show_alert=True)
             return
 
         if payment.status == PaymentStatus.SUCCEEDED.value and payment.vpn_key_id:
-            await callback.answer(
+            await _safe_cb_answer(callback, 
                 _extension_already_applied_text(lang), show_alert=True
             )
             return
@@ -1227,7 +1237,7 @@ async def extend_check_platega(callback: CallbackQuery, bot) -> None:
         settings = await BotSettingsService(session).get_all()
         platega = PlategaService.from_settings(settings)
         if not platega or not payment.external_id:
-            await callback.answer("Ошибка", show_alert=True)
+            await _safe_cb_answer(callback, "Ошибка", show_alert=True)
             return
 
         transaction = await platega.get_transaction_status(payment.external_id)
@@ -1242,12 +1252,12 @@ async def extend_check_platega(callback: CallbackQuery, bot) -> None:
                 str(transaction.get("transaction_id") or payment.external_id),
             )
             if exp:
-                await callback.answer(f"Продлено до {exp}!", show_alert=True)
+                await _safe_cb_answer(callback, f"Продлено до {exp}!", show_alert=True)
             else:
-                await callback.answer("Ошибка продления", show_alert=True)
+                await _safe_cb_answer(callback, "Ошибка продления", show_alert=True)
         else:
-            await callback.answer("Ожидание оплаты...", show_alert=True)
-    await callback.answer()
+            await _safe_cb_answer(callback, "Ожидание оплаты...", show_alert=True)
+    await _safe_cb_answer(callback)
 
 
 @router.callback_query(F.data.startswith("extend:check:yk:"))
@@ -1263,11 +1273,11 @@ async def extend_check_yk(callback: CallbackQuery, bot) -> None:
         lang = await _get_lang(callback.from_user.id, session)
         payment = await PaymentService(session).get_by_id(payment_id)
         if not payment or payment.user_id != callback.from_user.id:
-            await callback.answer("Платёж не найден", show_alert=True)
+            await _safe_cb_answer(callback, "Платёж не найден", show_alert=True)
             return
 
         if payment.status == PaymentStatus.SUCCEEDED.value and payment.vpn_key_id:
-            await callback.answer(
+            await _safe_cb_answer(callback, 
                 _extension_already_applied_text(lang), show_alert=True
             )
             return
@@ -1286,12 +1296,12 @@ async def extend_check_yk(callback: CallbackQuery, bot) -> None:
                     yk_payment.id,
                 )
                 if exp:
-                    await callback.answer(f"Продлено до {exp}!", show_alert=True)
+                    await _safe_cb_answer(callback, f"Продлено до {exp}!", show_alert=True)
                 else:
-                    await callback.answer("Ошибка продления", show_alert=True)
+                    await _safe_cb_answer(callback, "Ошибка продления", show_alert=True)
             else:
-                await callback.answer("Ожидание оплаты...", show_alert=True)
-    await callback.answer()
+                await _safe_cb_answer(callback, "Ожидание оплаты...", show_alert=True)
+    await _safe_cb_answer(callback)
 
 
 @router.callback_query(F.data.startswith("extend:check:crypto:"))
@@ -1316,26 +1326,26 @@ async def extend_check_crypto(callback: CallbackQuery, bot) -> None:
         settings = await BotSettingsService(session).get_all()
         crypto = CryptoBotService.from_settings(settings)
         if not crypto:
-            await callback.answer("Ошибка", show_alert=True)
+            await _safe_cb_answer(callback, "Ошибка", show_alert=True)
             return
 
         payment = await PaymentService(session).get_by_id(payment_id)
         if not payment or payment.user_id != callback.from_user.id:
-            await callback.answer("Платёж не найден", show_alert=True)
+            await _safe_cb_answer(callback, "Платёж не найден", show_alert=True)
             return
         if payment.status == PaymentStatus.SUCCEEDED.value and payment.vpn_key_id:
-            await callback.answer(
+            await _safe_cb_answer(callback, 
                 _extension_already_applied_text(lang), show_alert=True
             )
             return
         if not payment.external_id:
-            await callback.answer("Ошибка", show_alert=True)
+            await _safe_cb_answer(callback, "Ошибка", show_alert=True)
             return
         if not plan_id:
             key = await VpnKeyService(session).get_by_id(key_id)
             plan_id = int(key.plan_id) if key and key.plan_id else 0
             if not plan_id:
-                await callback.answer("Тариф не найден", show_alert=True)
+                await _safe_cb_answer(callback, "Тариф не найден", show_alert=True)
                 return
 
         invoice = await crypto.get_invoice(int(payment.external_id))
@@ -1348,12 +1358,12 @@ async def extend_check_crypto(callback: CallbackQuery, bot) -> None:
                 str(invoice.get("invoice_id") or payment.external_id),
             )
             if exp:
-                await callback.answer(f"Продлено до {exp}!", show_alert=True)
+                await _safe_cb_answer(callback, f"Продлено до {exp}!", show_alert=True)
             else:
-                await callback.answer("Ошибка продления", show_alert=True)
+                await _safe_cb_answer(callback, "Ошибка продления", show_alert=True)
         else:
-            await callback.answer("Ожидание оплаты...", show_alert=True)
-    await callback.answer()
+            await _safe_cb_answer(callback, "Ожидание оплаты...", show_alert=True)
+    await _safe_cb_answer(callback)
 
 
 @router.callback_query(F.data.startswith("extend:pay:"))
@@ -1376,18 +1386,18 @@ async def extend_pay(callback: CallbackQuery) -> None:
         user = await UserService(session).get_by_id(callback.from_user.id)
 
         if not key or not plan or not user:
-            await callback.answer("Ошибка", show_alert=True)
+            await _safe_cb_answer(callback, "Ошибка", show_alert=True)
             return
 
         if key.user_id != callback.from_user.id:
-            await callback.answer("Ошибка доступа", show_alert=True)
+            await _safe_cb_answer(callback, "Ошибка доступа", show_alert=True)
             return
 
         balance = float(user.balance or 0)
         price = float(plan.price or 0)
 
         if balance < price:
-            await callback.answer("Недостаточно баланса", show_alert=True)
+            await _safe_cb_answer(callback, "Недостаточно баланса", show_alert=True)
             return
 
         # Списываем баланс
@@ -1395,7 +1405,7 @@ async def extend_pay(callback: CallbackQuery) -> None:
             callback.from_user.id, Decimal(str(price))
         )
         if not updated:
-            await callback.answer("Ошибка списания", show_alert=True)
+            await _safe_cb_answer(callback, "Ошибка списания", show_alert=True)
             return
 
         payment = await PaymentService(session).create_pending(
@@ -1441,4 +1451,4 @@ async def extend_pay(callback: CallbackQuery) -> None:
         await edit_with_photo(callback, text, reply_markup=builder.as_markup())
     except Exception:
         pass
-    await callback.answer()
+    await _safe_cb_answer(callback)

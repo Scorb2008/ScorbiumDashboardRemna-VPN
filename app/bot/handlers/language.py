@@ -52,14 +52,20 @@ async def show_language(callback: CallbackQuery) -> None:
         reply_markup=language_kb(lang),
         photo=photo,
     )
-    await callback.answer()
+    try:
+        await callback.answer()
+    except Exception:
+        pass
 
 
 @router.callback_query(F.data.startswith("set_lang:"))
 async def set_language(callback: CallbackQuery) -> None:
     new_lang = callback.data.split(":")[1]
     if new_lang not in STRINGS:
-        await callback.answer("Unknown language", show_alert=True)
+        try:
+            await callback.answer("Unknown language", show_alert=True)
+        except Exception:
+            pass
         return
 
     async with AsyncSessionFactory() as session:
@@ -74,4 +80,7 @@ async def set_language(callback: CallbackQuery) -> None:
     await edit_with_photo(
         callback, t("language_set", new_lang), reply_markup=language_kb(new_lang)
     )
-    await callback.answer(t("language_set", new_lang))
+    try:
+        await callback.answer(t("language_set", new_lang)[:200])
+    except Exception:
+        pass

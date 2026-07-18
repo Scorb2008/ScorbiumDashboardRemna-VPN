@@ -147,7 +147,10 @@ async def cmd_profile(message: Message) -> None:
 
 @router.callback_query(F.data == "profile")
 async def show_profile(callback: CallbackQuery) -> None:
-    await callback.answer()
+    try:
+        await callback.answer()
+    except Exception:
+        pass
     user_id = callback.from_user.id
     async with AsyncSessionFactory() as session:
         _u = await UserService(session).get_by_id(user_id)
@@ -158,14 +161,7 @@ async def show_profile(callback: CallbackQuery) -> None:
         photo = await BotSettingsService(session).get("photo_profile")
     from app.bot.utils.media import edit_with_photo
 
-    try:
-        await edit_with_photo(callback, text, reply_markup=kb, photo=photo or None)
-    except Exception:
-        from app.bot.utils.media import answer_with_photo
-
-        await answer_with_photo(
-            callback.message, text, reply_markup=kb, photo=photo or None
-        )
+    await edit_with_photo(callback, text, reply_markup=kb, photo=photo or None)
 
 
 @router.message(Command("id"))

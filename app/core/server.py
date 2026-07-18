@@ -165,6 +165,32 @@ def _make_dp():
     from app.bot.middlewares.metrics import BotMetricsMiddleware
 
     dp.update.outer_middleware(BotMetricsMiddleware())
+
+    from aiogram.types import ErrorEvent
+    from aiogram.exceptions import TelegramBadRequest
+
+    @dp.error()
+    async def _global_error_handler(event: ErrorEvent):
+        exc = event.exception
+        if isinstance(exc, TelegramBadRequest):
+            err_text = str(exc).lower()
+            if any(
+                phrase in err_text
+                for phrase in (
+                    "query is too old",
+                    "query id is invalid",
+                    "response timeout expired",
+                    "message is not modified",
+                    "message to edit not found",
+                    "message can't be edited",
+                    "there is no text in the message",
+                    "message edit is not modified",
+                    "message contains no entities",
+                )
+            ):
+                return
+        log.warning("Bot handler error: %s", exc, exc_info=exc)
+
     dp.include_router(_start.router)
     dp.include_router(_buy.router)
     dp.include_router(_my_keys.router)

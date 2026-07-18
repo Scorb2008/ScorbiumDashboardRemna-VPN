@@ -19,6 +19,13 @@ async def _get_user_lang(user_id: int, session) -> str:
     return get_lang(settings, user_lang)
 
 
+async def _safe_answer(callback: CallbackQuery) -> None:
+    try:
+        await callback.answer()
+    except Exception:
+        pass
+
+
 @router.callback_query(F.data == "buy")
 async def show_plans(callback: CallbackQuery) -> None:
     async with AsyncSessionFactory() as session:
@@ -37,7 +44,7 @@ async def show_plans(callback: CallbackQuery) -> None:
                 is_admin=_is_admin(callback.from_user.id),
             )
         await edit_with_photo(callback, t("no_plans", lang), reply_markup=kb)
-        await callback.answer()
+        await _safe_answer(callback)
         return
 
     await edit_with_photo(
@@ -46,7 +53,7 @@ async def show_plans(callback: CallbackQuery) -> None:
         reply_markup=plans_kb(plans, lang=lang),
         photo=photo or None,
     )
-    await callback.answer()
+    await _safe_answer(callback)
 
 
 @router.callback_query(F.data.startswith("plan:"))
@@ -90,7 +97,7 @@ async def select_plan(callback: CallbackQuery) -> None:
         has_platega = _pl_toggle and bool(_pl_merchant and _pl_secret)
 
     if not plan or not plan_is_active:
-        await callback.answer(t("no_plans", lang), show_alert=True)
+        await _safe_answer(callback)
         return
 
     from app.services.telegram_stars import TelegramStarsService
@@ -115,4 +122,4 @@ async def select_plan(callback: CallbackQuery) -> None:
             lang=lang,
         ),
     )
-    await callback.answer()
+    await _safe_answer(callback)

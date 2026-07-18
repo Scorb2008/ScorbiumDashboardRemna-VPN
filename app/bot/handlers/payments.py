@@ -40,22 +40,10 @@ async def _safe_callback_answer(
         if text is None:
             await callback.answer()
         else:
-            await callback.answer(text, show_alert=show_alert)
+            await callback.answer(text[:200] if text else "", show_alert=show_alert)
         return True
-    except TelegramBadRequest as exc:
-        error_text = str(exc).lower()
-        if (
-            "query is too old" in error_text
-            or "query id is invalid" in error_text
-            or "response timeout expired" in error_text
-        ):
-            log.warning(
-                "Skipped stale callback answer for user %s: %s",
-                callback.from_user.id if callback.from_user else "unknown",
-                exc,
-            )
-            return False
-        raise
+    except Exception:
+        return False
 
 
 async def _get_user_lang(user_id: int, session) -> str:
@@ -243,20 +231,20 @@ async def handle_balance_payment(callback: CallbackQuery, bot: Bot) -> None:
         plan = await PlanService(session).get_by_id(plan_id)
         lang = await _get_user_lang(callback.from_user.id, session)
         if not plan or not plan.is_active:
-            await callback.answer(t("no_plans", lang), show_alert=True)
+            await _safe_callback_answer(callback, t("no_plans", lang), show_alert=True)
             return
 
         user = await UserService(session).get_by_id(callback.from_user.id)
         balance = float(user.balance or 0) if user else 0.0
 
         if balance < float(plan.price):
-            await callback.answer(
+            await _safe_callback_answer(callback, 
                 f"❌ {'Недостаточно средств' if lang == 'ru' else 'Insufficient funds'}. {balance:.2f} ₽ / {plan.price} ₽",
                 show_alert=True,
             )
             return
 
-    await callback.answer("⏳", show_alert=False)
+    await _safe_callback_answer(callback, "⏳", show_alert=False)
 
     async with AsyncSessionFactory() as session:
         plan = await PlanService(session).get_by_id(plan_id)
@@ -569,7 +557,7 @@ async def handle_stars_payment(callback: CallbackQuery, bot: Bot) -> None:
         plan = await PlanService(session).get_by_id(plan_id)
         lang = await _get_user_lang(callback.from_user.id, session)
         if not plan or not plan.is_active:
-            await callback.answer(t("no_plans", lang), show_alert=True)
+            await _safe_callback_answer(callback, t("no_plans", lang), show_alert=True)
             return
 
         stars = TelegramStarsService.rub_to_stars(
@@ -614,7 +602,7 @@ async def handle_stars_payment(callback: CallbackQuery, bot: Bot) -> None:
     except Exception:
         pass
 
-    await callback.answer()
+    await _safe_callback_answer(callback)
 
 
 @router.pre_checkout_query()
@@ -723,12 +711,12 @@ async def handle_crypto_payment(callback: CallbackQuery, bot: Bot) -> None:
         lang = await _get_user_lang(callback.from_user.id, session)
 
         if not plan or not plan.is_active:
-            await callback.answer(t("no_plans", lang), show_alert=True)
+            await _safe_callback_answer(callback, t("no_plans", lang), show_alert=True)
             return
 
         crypto = CryptoBotService.from_settings(settings)
         if not crypto:
-            await callback.answer(t("payment_error", lang), show_alert=True)
+            await _safe_callback_answer(callback, t("payment_error", lang), show_alert=True)
             return
 
         try:
@@ -750,7 +738,7 @@ async def handle_crypto_payment(callback: CallbackQuery, bot: Bot) -> None:
 
             if not invoice:
                 await session.rollback()
-                await callback.answer(t("payment_error", lang), show_alert=True)
+                await _safe_callback_answer(callback, t("payment_error", lang), show_alert=True)
                 return
 
             payment.external_id = str(invoice["invoice_id"])
@@ -791,7 +779,7 @@ async def handle_crypto_payment(callback: CallbackQuery, bot: Bot) -> None:
 
             await edit_with_photo(callback, t("payment_error", lang), reply_markup=kb)
 
-    await callback.answer()
+    await _safe_callback_answer(callback)
 
 
 @router.callback_query(F.data.startswith("crypto:check:"))
@@ -806,11 +794,11 @@ async def handle_crypto_check(callback: CallbackQuery, bot: Bot) -> None:
         lang = await _get_user_lang(callback.from_user.id, session)
         payment = await PaymentService(session).get_by_id(payment_id)
         if not payment or payment.user_id != callback.from_user.id:
-            await callback.answer("❌", show_alert=True)
+            await _safe_callback_answer(callback, "❌", show_alert=True)
             return
 
         if payment.status == PaymentStatus.SUCCEEDED.value and payment.vpn_key_id:
-            await callback.answer(
+            await _safe_callback_answer(callback, 
                 _payment_already_confirmed_text(lang), show_alert=True
             )
             return
@@ -818,7 +806,7 @@ async def handle_crypto_check(callback: CallbackQuery, bot: Bot) -> None:
         settings = await BotSettingsService(session).get_all()
         crypto = CryptoBotService.from_settings(settings)
         if not crypto or not payment.external_id:
-            await callback.answer(t("payment_error", lang), show_alert=True)
+            await _safe_callback_answer(callback, t("payment_error", lang), show_alert=True)
             return
 
         external_id = payment.external_id
@@ -830,7 +818,7 @@ async def handle_crypto_check(callback: CallbackQuery, bot: Bot) -> None:
                 payment = await PaymentService(session).get_by_id(payment_id)
                 plan = await PlanService(session).get_by_id(plan_id)
                 if not payment or not plan or payment.user_id != callback.from_user.id:
-                    await callback.answer(t("payment_error", lang), show_alert=True)
+                    await _safe_callback_answer(callback, t("payment_error", lang), show_alert=True)
                     return
                 confirmation = await PaymentService(session).confirm_once(
                     payment_id, str(invoice.get("invoice_id") or external_id)
@@ -839,7 +827,7 @@ async def handle_crypto_check(callback: CallbackQuery, bot: Bot) -> None:
                     session
                 ).provision_subscription_once(payment_id, callback.from_user.id, plan)
                 await session.commit()
-            await callback.answer(t("payment_success", lang), show_alert=True)
+            await _safe_callback_answer(callback, t("payment_success", lang), show_alert=True)
             should_notify_user = confirmation.just_confirmed or delivery.just_processed
             if should_notify_user:
                 await _provision_and_notify(
@@ -851,10 +839,10 @@ async def handle_crypto_check(callback: CallbackQuery, bot: Bot) -> None:
                     force_admin_notify=delivery.just_processed,
                 )
         else:
-            await callback.answer(t("payment_pending", lang), show_alert=True)
+            await _safe_callback_answer(callback, t("payment_pending", lang), show_alert=True)
     except Exception as e:
         log.error(f"CryptoBot check error: {e}")
-        await callback.answer(t("payment_error", lang), show_alert=True)
+        await _safe_callback_answer(callback, t("payment_error", lang), show_alert=True)
 
 
 # ── Пополнение баланса ────────────────────────────────────────────────────────
@@ -992,7 +980,7 @@ async def topup_yookassa(callback: CallbackQuery, bot: Bot) -> None:
 
             await edit_with_photo(callback, t("payment_error", lang), reply_markup=kb)
 
-    await callback.answer()
+    await _safe_callback_answer(callback)
 
 
 @router.callback_query(F.data.startswith("topup:check:yookassa:"))
@@ -1005,16 +993,16 @@ async def topup_check_yookassa(callback: CallbackQuery, bot: Bot) -> None:
         if payment_id:
             existing = await PaymentService(session).get_by_id(payment_id)
             if not existing or existing.user_id != callback.from_user.id:
-                await callback.answer(t("payment_error", lang), show_alert=True)
+                await _safe_callback_answer(callback, t("payment_error", lang), show_alert=True)
                 return
             if existing.status == PaymentStatus.SUCCEEDED.value:
-                await callback.answer(
+                await _safe_callback_answer(callback, 
                     f"✅ {'Уже зачислено!' if lang == 'ru' else 'Already credited!'}",
                     show_alert=True,
                 )
                 return
             if not existing.external_id:
-                await callback.answer(t("payment_error", lang), show_alert=True)
+                await _safe_callback_answer(callback, t("payment_error", lang), show_alert=True)
                 return
 
         try:
@@ -1024,15 +1012,15 @@ async def topup_check_yookassa(callback: CallbackQuery, bot: Bot) -> None:
             yk_payment = await yk.get_payment(existing.external_id)
             if yk_payment.status == "succeeded":
                 await _topup_confirm_balance(payment_id, yk_payment.id, bot)
-                await callback.answer(
+                await _safe_callback_answer(callback, 
                     f"✅ {'Баланс пополнен!' if lang == 'ru' else 'Balance topped up!'}",
                     show_alert=True,
                 )
             else:
-                await callback.answer(t("payment_pending", lang), show_alert=True)
+                await _safe_callback_answer(callback, t("payment_pending", lang), show_alert=True)
         except Exception as e:
             log.error(f"Topup YooKassa check error: {e}")
-            await callback.answer(t("payment_error", lang), show_alert=True)
+            await _safe_callback_answer(callback, t("payment_error", lang), show_alert=True)
 
 
 @router.callback_query(F.data.startswith("topup:pay:sbp:"))
@@ -1104,7 +1092,7 @@ async def topup_sbp(callback: CallbackQuery, bot: Bot) -> None:
 
             await edit_with_photo(callback, t("payment_error", lang), reply_markup=kb)
 
-    await callback.answer()
+    await _safe_callback_answer(callback)
 
 
 @router.callback_query(F.data.startswith("topup:pay:crypto:"))
@@ -1118,7 +1106,7 @@ async def topup_crypto(callback: CallbackQuery, bot: Bot) -> None:
         settings = await BotSettingsService(session).get_all()
         crypto = CryptoBotService.from_settings(settings)
         if not crypto:
-            await callback.answer(t("topup_error", lang), show_alert=True)
+            await _safe_callback_answer(callback, t("topup_error", lang), show_alert=True)
             return
 
         try:
@@ -1140,7 +1128,7 @@ async def topup_crypto(callback: CallbackQuery, bot: Bot) -> None:
 
             if not invoice:
                 await session.rollback()
-                await callback.answer(t("topup_error", lang), show_alert=True)
+                await _safe_callback_answer(callback, t("topup_error", lang), show_alert=True)
                 return
 
             payment.external_id = str(invoice["invoice_id"])
@@ -1170,9 +1158,9 @@ async def topup_crypto(callback: CallbackQuery, bot: Bot) -> None:
             )
         except Exception as e:
             log.error(f"Topup crypto error: {e}")
-            await callback.answer(t("topup_error", lang), show_alert=True)
+            await _safe_callback_answer(callback, t("topup_error", lang), show_alert=True)
 
-    await callback.answer()
+    await _safe_callback_answer(callback)
 
 
 @router.callback_query(F.data.startswith("topup:check:crypto:"))
@@ -1189,22 +1177,22 @@ async def topup_check_crypto(callback: CallbackQuery, bot: Bot) -> None:
         if payment_id:
             existing = await PaymentService(session).get_by_id(payment_id)
             if not existing or existing.user_id != callback.from_user.id:
-                await callback.answer(t("topup_error", lang), show_alert=True)
+                await _safe_callback_answer(callback, t("topup_error", lang), show_alert=True)
                 return
             if existing.status == PaymentStatus.SUCCEEDED.value:
-                await callback.answer(
+                await _safe_callback_answer(callback, 
                     f"✅ {'Уже зачислено!' if lang == 'ru' else 'Already credited!'}",
                     show_alert=True,
                 )
                 return
             if not existing.external_id:
-                await callback.answer(t("topup_error", lang), show_alert=True)
+                await _safe_callback_answer(callback, t("topup_error", lang), show_alert=True)
                 return
             external_id = existing.external_id
         settings = await BotSettingsService(session).get_all()
         crypto = CryptoBotService.from_settings(settings)
         if not crypto:
-            await callback.answer(t("topup_error", lang), show_alert=True)
+            await _safe_callback_answer(callback, t("topup_error", lang), show_alert=True)
             return
 
     try:
@@ -1213,15 +1201,15 @@ async def topup_check_crypto(callback: CallbackQuery, bot: Bot) -> None:
             await _topup_confirm_balance(
                 payment_id, str(invoice.get("invoice_id") or external_id), bot
             )
-            await callback.answer(
+            await _safe_callback_answer(callback, 
                 f"✅ {'Баланс пополнен!' if lang == 'ru' else 'Balance topped up!'}",
                 show_alert=True,
             )
         else:
-            await callback.answer(t("payment_pending", lang), show_alert=True)
+            await _safe_callback_answer(callback, t("payment_pending", lang), show_alert=True)
     except Exception as e:
         log.error(f"Topup crypto check error: {e}")
-        await callback.answer(t("topup_error", lang), show_alert=True)
+        await _safe_callback_answer(callback, t("topup_error", lang), show_alert=True)
 
 
 # ── Platega ───────────────────────────────────────────────────────────────────
@@ -1236,12 +1224,12 @@ async def handle_platega_payment(callback: CallbackQuery, bot: Bot) -> None:
         settings = await BotSettingsService(session).get_all()
         lang = await _get_user_lang(callback.from_user.id, session)
         if not plan or not plan.is_active:
-            await callback.answer(t("no_plans", lang), show_alert=True)
+            await _safe_callback_answer(callback, t("no_plans", lang), show_alert=True)
             return
 
         platega = PlategaService.from_settings(settings)
         if not platega:
-            await callback.answer(t("payment_error", lang), show_alert=True)
+            await _safe_callback_answer(callback, t("payment_error", lang), show_alert=True)
             return
 
         try:
@@ -1267,7 +1255,7 @@ async def handle_platega_payment(callback: CallbackQuery, bot: Bot) -> None:
             )
             if not transaction.get("ok") or not transaction.get("url"):
                 await session.rollback()
-                await callback.answer(t("payment_error", lang), show_alert=True)
+                await _safe_callback_answer(callback, t("payment_error", lang), show_alert=True)
                 return
 
             payment.external_id = str(transaction.get("transaction_id") or "")
@@ -1309,7 +1297,7 @@ async def handle_platega_payment(callback: CallbackQuery, bot: Bot) -> None:
 
             await edit_with_photo(callback, t("payment_error", lang), reply_markup=kb)
 
-    await callback.answer()
+    await _safe_callback_answer(callback)
 
 
 @router.callback_query(F.data.startswith("platega:check:"))
@@ -1322,10 +1310,10 @@ async def handle_platega_check(callback: CallbackQuery, bot: Bot) -> None:
         lang = await _get_user_lang(callback.from_user.id, session)
         payment = await PaymentService(session).get_by_id(payment_id)
         if not payment or payment.user_id != callback.from_user.id:
-            await callback.answer("❌", show_alert=True)
+            await _safe_callback_answer(callback, "❌", show_alert=True)
             return
         if payment.status == PaymentStatus.SUCCEEDED.value and payment.vpn_key_id:
-            await callback.answer(
+            await _safe_callback_answer(callback, 
                 _payment_already_confirmed_text(lang), show_alert=True
             )
             return
@@ -1333,7 +1321,7 @@ async def handle_platega_check(callback: CallbackQuery, bot: Bot) -> None:
         settings = await BotSettingsService(session).get_all()
         platega = PlategaService.from_settings(settings)
         if not platega or not payment.external_id:
-            await callback.answer(t("payment_error", lang), show_alert=True)
+            await _safe_callback_answer(callback, t("payment_error", lang), show_alert=True)
             return
 
     try:
@@ -1345,7 +1333,7 @@ async def handle_platega_check(callback: CallbackQuery, bot: Bot) -> None:
                 payment = await PaymentService(session).get_by_id(payment_id)
                 plan = await PlanService(session).get_by_id(plan_id)
                 if not payment or not plan or payment.user_id != callback.from_user.id:
-                    await callback.answer(t("payment_error", lang), show_alert=True)
+                    await _safe_callback_answer(callback, t("payment_error", lang), show_alert=True)
                     return
                 confirmation = await PaymentService(session).confirm_once(
                     payment_id,
@@ -1355,7 +1343,7 @@ async def handle_platega_check(callback: CallbackQuery, bot: Bot) -> None:
                     session
                 ).provision_subscription_once(payment_id, callback.from_user.id, plan)
                 await session.commit()
-            await callback.answer(t("payment_success", lang), show_alert=True)
+            await _safe_callback_answer(callback, t("payment_success", lang), show_alert=True)
             should_notify_user = confirmation.just_confirmed or delivery.just_processed
             if should_notify_user:
                 await _provision_and_notify(
@@ -1367,10 +1355,10 @@ async def handle_platega_check(callback: CallbackQuery, bot: Bot) -> None:
                     force_admin_notify=delivery.just_processed,
                 )
         else:
-            await callback.answer(t("payment_pending", lang), show_alert=True)
+            await _safe_callback_answer(callback, t("payment_pending", lang), show_alert=True)
     except Exception as e:
         log.error(f"Platega check error: {e}")
-        await callback.answer(t("payment_error", lang), show_alert=True)
+        await _safe_callback_answer(callback, t("payment_error", lang), show_alert=True)
 
 
 # ── FreeKassa ─────────────────────────────────────────────────────────────────
@@ -1384,13 +1372,13 @@ async def handle_freekassa_payment(callback: CallbackQuery, bot: Bot) -> None:
         plan = await PlanService(session).get_by_id(plan_id)
         lang = await _get_user_lang(callback.from_user.id, session)
         if not plan or not plan.is_active:
-            await callback.answer(t("no_plans", lang), show_alert=True)
+            await _safe_callback_answer(callback, t("no_plans", lang), show_alert=True)
             return
 
         settings = await BotSettingsService(session).get_all()
         fk = FreeKassaService.from_settings(settings)
         if not fk:
-            await callback.answer(t("payment_error", lang), show_alert=True)
+            await _safe_callback_answer(callback, t("payment_error", lang), show_alert=True)
             return
 
         try:
@@ -1447,7 +1435,7 @@ async def handle_freekassa_payment(callback: CallbackQuery, bot: Bot) -> None:
 
             await edit_with_photo(callback, t("payment_error", lang), reply_markup=kb)
 
-    await callback.answer()
+    await _safe_callback_answer(callback)
 
 
 @router.callback_query(F.data.startswith("freekassa:check:"))
@@ -1460,23 +1448,23 @@ async def handle_freekassa_check(callback: CallbackQuery, bot: Bot) -> None:
         lang = await _get_user_lang(callback.from_user.id, session)
         payment = await PaymentService(session).get_by_id(payment_id)
         if not payment or payment.user_id != callback.from_user.id:
-            await callback.answer("❌", show_alert=True)
+            await _safe_callback_answer(callback, "❌", show_alert=True)
             return
 
         if payment.status == PaymentStatus.SUCCEEDED.value and payment.vpn_key_id:
-            await callback.answer(
+            await _safe_callback_answer(callback, 
                 _payment_already_confirmed_text(lang), show_alert=True
             )
             return
 
         if not payment.external_id:
-            await callback.answer(t("payment_error", lang), show_alert=True)
+            await _safe_callback_answer(callback, t("payment_error", lang), show_alert=True)
             return
 
         settings = await BotSettingsService(session).get_all()
         fk = FreeKassaService.from_settings(settings)
         if not fk:
-            await callback.answer(t("payment_error", lang), show_alert=True)
+            await _safe_callback_answer(callback, t("payment_error", lang), show_alert=True)
             return
 
     try:
@@ -1492,7 +1480,7 @@ async def handle_freekassa_check(callback: CallbackQuery, bot: Bot) -> None:
                         or not plan
                         or payment.user_id != callback.from_user.id
                     ):
-                        await callback.answer(t("payment_error", lang), show_alert=True)
+                        await _safe_callback_answer(callback, t("payment_error", lang), show_alert=True)
                         return
                     confirmation = await PaymentService(sess2).confirm_once(
                         payment_id, payment.external_id or f"fk_{payment_id}"
@@ -1503,7 +1491,7 @@ async def handle_freekassa_check(callback: CallbackQuery, bot: Bot) -> None:
                         payment_id, callback.from_user.id, plan
                     )
                     await sess2.commit()
-                await callback.answer(t("payment_success", lang), show_alert=True)
+                await _safe_callback_answer(callback, t("payment_success", lang), show_alert=True)
                 should_notify_user = (
                     confirmation.just_confirmed or delivery.just_processed
                 )
@@ -1517,12 +1505,12 @@ async def handle_freekassa_check(callback: CallbackQuery, bot: Bot) -> None:
                         force_admin_notify=delivery.just_processed,
                     )
             else:
-                await callback.answer(t("payment_pending", lang), show_alert=True)
+                await _safe_callback_answer(callback, t("payment_pending", lang), show_alert=True)
         else:
-            await callback.answer(t("payment_pending", lang), show_alert=True)
+            await _safe_callback_answer(callback, t("payment_pending", lang), show_alert=True)
     except Exception as e:
         log.error(f"FreeKassa check error: {e}")
-        await callback.answer(t("payment_error", lang), show_alert=True)
+        await _safe_callback_answer(callback, t("payment_error", lang), show_alert=True)
 
 
 # ── Пополнение баланса через FreeKassa ────────────────────────────────────────
@@ -1539,7 +1527,7 @@ async def topup_freekassa(callback: CallbackQuery, bot: Bot) -> None:
         settings = await BotSettingsService(session).get_all()
         fk = FreeKassaService.from_settings(settings)
         if not fk:
-            await callback.answer(t("topup_error", lang), show_alert=True)
+            await _safe_callback_answer(callback, t("topup_error", lang), show_alert=True)
             return
 
         try:
@@ -1585,9 +1573,9 @@ async def topup_freekassa(callback: CallbackQuery, bot: Bot) -> None:
             )
         except Exception as e:
             log.error(f"Topup FreeKassa error: {e}")
-            await callback.answer(t("topup_error", lang), show_alert=True)
+            await _safe_callback_answer(callback, t("topup_error", lang), show_alert=True)
 
-    await callback.answer()
+    await _safe_callback_answer(callback)
 
 
 @router.callback_query(F.data.startswith("topup:check:freekassa:"))
@@ -1600,10 +1588,10 @@ async def topup_check_freekassa(callback: CallbackQuery, bot: Bot) -> None:
         lang = await _get_user_lang(callback.from_user.id, session)
         existing = await PaymentService(session).get_by_id(payment_id)
         if not existing or existing.user_id != callback.from_user.id:
-            await callback.answer(t("topup_error", lang), show_alert=True)
+            await _safe_callback_answer(callback, t("topup_error", lang), show_alert=True)
             return
         if existing.status == PaymentStatus.SUCCEEDED.value:
-            await callback.answer(
+            await _safe_callback_answer(callback, 
                 f"✅ {'Уже зачислено!' if lang == 'ru' else 'Already credited!'}",
                 show_alert=True,
             )
@@ -1612,7 +1600,7 @@ async def topup_check_freekassa(callback: CallbackQuery, bot: Bot) -> None:
         settings = await BotSettingsService(session).get_all()
         fk = FreeKassaService.from_settings(settings)
         if not fk:
-            await callback.answer(t("topup_error", lang), show_alert=True)
+            await _safe_callback_answer(callback, t("topup_error", lang), show_alert=True)
             return
 
     try:
@@ -1623,17 +1611,17 @@ async def topup_check_freekassa(callback: CallbackQuery, bot: Bot) -> None:
                 await _topup_confirm_balance(
                     payment_id, existing.external_id or f"fk_topup_{payment_id}", bot
                 )
-                await callback.answer(
+                await _safe_callback_answer(callback, 
                     f"✅ {'Баланс пополнен!' if lang == 'ru' else 'Balance topped up!'}",
                     show_alert=True,
                 )
             else:
-                await callback.answer(t("payment_pending", lang), show_alert=True)
+                await _safe_callback_answer(callback, t("payment_pending", lang), show_alert=True)
         else:
-            await callback.answer(t("payment_pending", lang), show_alert=True)
+            await _safe_callback_answer(callback, t("payment_pending", lang), show_alert=True)
     except Exception as e:
         log.error(f"Topup FreeKassa check error: {e}")
-        await callback.answer(t("topup_error", lang), show_alert=True)
+        await _safe_callback_answer(callback, t("topup_error", lang), show_alert=True)
 
 
 @router.callback_query(F.data.startswith("topup:pay:platega:"))
@@ -1647,7 +1635,7 @@ async def topup_platega(callback: CallbackQuery, bot: Bot) -> None:
         settings = await BotSettingsService(session).get_all()
         platega = PlategaService.from_settings(settings)
         if not platega:
-            await callback.answer(t("topup_error", lang), show_alert=True)
+            await _safe_callback_answer(callback, t("topup_error", lang), show_alert=True)
             return
 
         try:
@@ -1673,7 +1661,7 @@ async def topup_platega(callback: CallbackQuery, bot: Bot) -> None:
             )
             if not transaction.get("ok") or not transaction.get("url"):
                 await session.rollback()
-                await callback.answer(t("topup_error", lang), show_alert=True)
+                await _safe_callback_answer(callback, t("topup_error", lang), show_alert=True)
                 return
 
             payment.external_id = str(transaction.get("transaction_id") or "")
@@ -1704,9 +1692,9 @@ async def topup_platega(callback: CallbackQuery, bot: Bot) -> None:
             )
         except Exception as e:
             log.error(f"Topup Platega error: {e}")
-            await callback.answer(t("topup_error", lang), show_alert=True)
+            await _safe_callback_answer(callback, t("topup_error", lang), show_alert=True)
 
-    await callback.answer()
+    await _safe_callback_answer(callback)
 
 
 @router.callback_query(F.data.startswith("topup:check:platega:"))
@@ -1718,10 +1706,10 @@ async def topup_check_platega(callback: CallbackQuery, bot: Bot) -> None:
         lang = await _get_user_lang(callback.from_user.id, session)
         existing = await PaymentService(session).get_by_id(payment_id)
         if not existing or existing.user_id != callback.from_user.id:
-            await callback.answer(t("topup_error", lang), show_alert=True)
+            await _safe_callback_answer(callback, t("topup_error", lang), show_alert=True)
             return
         if existing.status == PaymentStatus.SUCCEEDED.value:
-            await callback.answer(
+            await _safe_callback_answer(callback, 
                 f"✅ {'Уже зачислено!' if lang == 'ru' else 'Already credited!'}",
                 show_alert=True,
             )
@@ -1730,7 +1718,7 @@ async def topup_check_platega(callback: CallbackQuery, bot: Bot) -> None:
         settings = await BotSettingsService(session).get_all()
         platega = PlategaService.from_settings(settings)
         if not platega or not existing.external_id:
-            await callback.answer(t("topup_error", lang), show_alert=True)
+            await _safe_callback_answer(callback, t("topup_error", lang), show_alert=True)
             return
 
     try:
@@ -1743,15 +1731,15 @@ async def topup_check_platega(callback: CallbackQuery, bot: Bot) -> None:
                 str(transaction.get("transaction_id") or existing.external_id),
                 bot,
             )
-            await callback.answer(
+            await _safe_callback_answer(callback, 
                 f"✅ {'Баланс пополнен!' if lang == 'ru' else 'Balance topped up!'}",
                 show_alert=True,
             )
         else:
-            await callback.answer(t("payment_pending", lang), show_alert=True)
+            await _safe_callback_answer(callback, t("payment_pending", lang), show_alert=True)
     except Exception as e:
         log.error(f"Topup Platega check error: {e}")
-        await callback.answer(t("topup_error", lang), show_alert=True)
+        await _safe_callback_answer(callback, t("topup_error", lang), show_alert=True)
 
 
 # ── Fallback ──────────────────────────────────────────────────────────────────
@@ -1776,7 +1764,7 @@ async def handle_payment_fallback(callback: CallbackQuery, bot: Bot) -> None:
     log.warning(f"[payment_fallback] user={user_id} data={callback.data}")
 
     try:
-        await callback.answer(error_msg, show_alert=True)
+        await _safe_callback_answer(callback, error_msg, show_alert=True)
     except Exception:
         try:
             await bot.send_message(user_id, error_msg)

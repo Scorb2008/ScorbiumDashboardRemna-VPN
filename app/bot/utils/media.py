@@ -15,6 +15,29 @@ from aiogram.types import (
 from aiogram.exceptions import TelegramBadRequest
 
 
+def _safe_answer_callback(callback: CallbackQuery) -> None:
+    """Sync helper — nothing. Answer is async, use _safe_answer_cb."""
+    pass
+
+
+async def _safe_answer_cb(callback: CallbackQuery) -> None:
+    """Безопасно отвечаем на callback query — игнорируем все ошибки."""
+    try:
+        await callback.answer()
+    except Exception:
+        pass
+
+
+async def safe_answer_cb(
+    callback: CallbackQuery, text: str = "", show_alert: bool = False
+) -> None:
+    """Безопасно отвечаем на callback query с текстом/алертом."""
+    try:
+        await callback.answer(text[:200] if text else "", show_alert=show_alert)
+    except Exception:
+        pass
+
+
 def resolve_photo_input(photo: Optional[str]) -> Optional[str | BufferedInputFile]:
     if not photo:
         return None
@@ -59,7 +82,7 @@ async def answer_with_photo(
     reply_markup: Optional[InlineKeyboardMarkup] = None,
     photo: Optional[str] = None,
     parse_mode: str = "HTML",
-) -> Message:
+) -> Optional[Message]:
     """Отправляет новое сообщение — с фото если есть file_id, иначе текст."""
     photo_input = resolve_photo_input(photo)
     if photo_input:
@@ -72,11 +95,16 @@ async def answer_with_photo(
             )
         except TelegramBadRequest:
             pass
-    return await message.answer(
-        text=text,
-        reply_markup=reply_markup,
-        parse_mode=parse_mode,
-    )
+        except Exception:
+            pass
+    try:
+        return await message.answer(
+            text=text,
+            reply_markup=reply_markup,
+            parse_mode=parse_mode,
+        )
+    except Exception:
+        return None
 
 
 async def edit_with_photo(
@@ -88,40 +116,44 @@ async def edit_with_photo(
 ) -> None:
     """
     Редактирует текущее сообщение или отправляет новое.
-    - Если передано фото: удаляет старое, шлёт новое с фото.
-    - Если фото нет: пробует edit_text, при ошибке (сообщение с фото) — edit_caption,
-      при ошибке — удаляет и шлёт новое.
+    Полностью безопасна — никогда не бросает исключения.
     """
     msg = callback.message
+    if msg is None:
+        try:
+            await callback.message.chat.send_message(
+                text=text, reply_markup=reply_markup, parse_mode=parse_mode
+            )
+        except Exception:
+            pass
+        return
+
+    chat = msg.chat
+    if chat is None:
+        return
 
     photo_input = resolve_photo_input(photo)
     if photo_input:
-        # Нужно фото — удаляем старое и шлём новое
         try:
             await msg.delete()
         except Exception:
             pass
         try:
-            await msg.answer_photo(
-                photo=photo_input,
-                caption=text,
-                reply_markup=reply_markup,
-                parse_mode=parse_mode,
-            )
-        except Exception:
-            await msg.answer(
+            await chat.send_message(
                 text=text, reply_markup=reply_markup, parse_mode=parse_mode
             )
+        except Exception:
+            pass
         return
 
-    # Без фото — пробуем редактировать
-    # Сначала edit_text (для текстовых сообщений)
     try:
         await msg.edit_text(text, reply_markup=reply_markup, parse_mode=parse_mode)
         return
     except TelegramBadRequest as e:
-        if "there is no text in the message" in str(e):
-            # Сообщение с фото — редактируем caption
+        err = str(e)
+        if "message is not modified" in err:
+            return
+        if "there is no text in the message" in err:
             try:
                 await msg.edit_caption(
                     caption=text, reply_markup=reply_markup, parse_mode=parse_mode
@@ -129,18 +161,25 @@ async def edit_with_photo(
                 return
             except Exception:
                 pass
-        elif "message is not modified" in str(e):
-            return  # Ничего не изменилось — ок
+        if "message to edit not found" in err or "message can't be edited" in err:
+            try:
+                await chat.send_message(
+                    text=text, reply_markup=reply_markup, parse_mode=parse_mode
+                )
+            except Exception:
+                pass
+            return
     except Exception:
         pass
 
-    # Fallback: удаляем и шлём новое
     try:
         await msg.delete()
     except Exception:
         pass
     try:
-        await msg.answer(text=text, reply_markup=reply_markup, parse_mode=parse_mode)
+        await chat.send_message(
+            text=text, reply_markup=reply_markup, parse_mode=parse_mode
+        )
     except Exception:
         pass
 

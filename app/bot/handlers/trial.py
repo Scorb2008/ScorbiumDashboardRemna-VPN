@@ -33,14 +33,17 @@ async def handle_trial(callback: CallbackQuery) -> None:
         settings = await BotSettingsService(session).get_all()
 
         if settings.get("trial_enabled", "0") != "1":
-            await callback.answer(
-                {
-                    "ru": "❌ Пробный период недоступен.",
-                    "en": "❌ Trial not available.",
-                    "fa": "❌ دوره آزمایشی در دسترس نیست.",
-                }.get(lang, "❌"),
-                show_alert=True,
-            )
+            try:
+                await callback.answer(
+                    {
+                        "ru": "❌ Пробный период недоступен.",
+                        "en": "❌ Trial not available.",
+                        "fa": "❌ دوره آزمایشی در دسترس نیست.",
+                    }.get(lang, "❌"),
+                    show_alert=True,
+                )
+            except Exception:
+                pass
             return
 
         trial_days = int(settings.get("trial_days", "3"))
@@ -53,7 +56,10 @@ async def handle_trial(callback: CallbackQuery) -> None:
                 "en": "❌ Trial is only available for new users without subscriptions.",
                 "fa": "❌ دوره آزمایشی فقط برای کاربران جدید بدون اشتراک در دسترس است.",
             }
-            await callback.answer(msgs.get(lang, msgs["ru"]), show_alert=True)
+            try:
+                await callback.answer(msgs.get(lang, msgs["ru"]), show_alert=True)
+            except Exception:
+                pass
             return
 
         from datetime import datetime, timezone, timedelta
@@ -101,13 +107,19 @@ async def handle_trial(callback: CallbackQuery) -> None:
             log.error(f"Trial Remnawave error for user {callback.from_user.id}: {e}")
             await session.delete(key)
             await session.flush()
-            await callback.answer(t("key_error", lang), show_alert=True)
+            try:
+                await callback.answer(t("key_error", lang), show_alert=True)
+            except Exception:
+                pass
             return
 
         await session.commit()
 
     if not key:
-        await callback.answer(t("key_error", lang), show_alert=True)
+        try:
+            await callback.answer(t("key_error", lang), show_alert=True)
+        except Exception:
+            pass
         return
 
     msgs = {
@@ -149,4 +161,7 @@ async def handle_trial(callback: CallbackQuery) -> None:
     await edit_with_photo(
         callback, msgs.get(lang, msgs["ru"]), reply_markup=kb, photo=photo_trial
     )
-    await callback.answer()
+    try:
+        await callback.answer()
+    except Exception:
+        pass
