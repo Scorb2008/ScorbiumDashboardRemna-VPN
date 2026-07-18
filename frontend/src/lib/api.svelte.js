@@ -158,6 +158,11 @@ class ApiClient {
   getBotDescription(languageCode = 'ru') { return this.get('/telegram/get-description', { language_code: languageCode }); }
   refreshWebhook() { return this.post('/telegram/refresh-webhook'); }
 
+  // VPN Groups
+  getVpnGroups() { return this.get('/telegram/groups'); }
+  getSelectedVpnGroups() { return this.get('/telegram/groups/selected'); }
+  saveSelectedVpnGroups(groupIds) { return this.post('/telegram/groups/selected', { group_ids: groupIds }); }
+
   // Referrals
   getReferralStats() { return this.get('/referrals/stats'); }
   getReferrals(params = {}) { return this.get('/referrals/', params); }

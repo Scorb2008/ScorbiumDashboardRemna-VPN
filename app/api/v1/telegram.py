@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, File, Form, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, status
 from pydantic import BaseModel
-from typing import Optional
 
-from app.api.dependencies import get_current_admin
+from app.api.dependencies import get_current_admin, get_db
+from app.services.bot_settings import BotSettingsService, parse_int_list_setting
 from app.services.telegram_notify import TelegramNotifyService
 
 
@@ -200,3 +200,50 @@ async def refresh_webhook(
             return {"ok": True, "detail": "Webhook deleted (polling mode)"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+# ── VPN Groups ────────────────────────────────────────────────────────────────
+
+
+class SaveGroupsBody(BaseModel):
+    group_ids: list[int] = []
+
+
+@router.get("/groups", summary="List Remnawave VPN groups")
+async def list_groups(
+    _: str = Depends(get_current_admin),
+) -> dict:
+    from app.services.remnawave.remnawave_api import RemnawaveService
+
+    try:
+        groups = await RemnawaveService().get_groups()
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Failed to fetch groups from Remnawave: {e}",
+        )
+    return {"groups": groups}
+
+
+@router.get("/groups/selected", summary="Get selected VPN group IDs")
+async def get_selected_groups(
+    db=Depends(get_db),
+    _: str = Depends(get_current_admin),
+) -> dict:
+    svc = BotSettingsService(db)
+    raw = await svc.get("vpn_group_ids")
+    return {"group_ids": parse_int_list_setting(raw) if raw else []}
+
+
+@router.post("/groups/selected", summary="Save selected VPN group IDs")
+async def save_selected_groups(
+    body: SaveGroupsBody,
+    db=Depends(get_db),
+    _: str = Depends(get_current_admin),
+) -> dict:
+    import json
+
+    svc = BotSettingsService(db)
+    await svc.set("vpn_group_ids", json.dumps(body.group_ids))
+    await db.commit()
+    return {"ok": True, "group_ids": body.group_ids}

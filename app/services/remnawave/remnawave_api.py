@@ -369,7 +369,32 @@ class RemnawaveService(VpnPanelInterface):
         )
 
     async def get_groups(self) -> list[dict]:
-        return []
+        try:
+            data = await self._client.get(
+                "/api/external-api/v2/protocol/groups"
+            )
+            if isinstance(data, list):
+                return data
+            if isinstance(data, dict):
+                return data.get("groups", []) or data.get("response", []) or []
+            return []
+        except RemnawaveRequestError as e:
+            log.warning(f"[get_groups] failed: {e}")
+            return []
+
+    async def assign_groups(
+        self, user_uuid: str, group_ids: list[int]
+    ) -> dict | None:
+        if not group_ids:
+            return None
+        try:
+            return await self._client.post(
+                "/api/external-api/v2/protocol/groups/assign",
+                {"userUuid": user_uuid, "groupIds": group_ids},
+            )
+        except RemnawaveRequestError as e:
+            log.warning(f"[assign_groups] failed for {user_uuid}: {e}")
+            return None
 
     # ── Subscription link ──────────────────────────────────────────────────
 

@@ -114,16 +114,6 @@ class VpnKeyService:
         )
         return result.scalar_one()
 
-    async def count_for_users(self, user_ids: list[int]) -> dict[int, int]:
-        if not user_ids:
-            return {}
-        result = await self.session.execute(
-            select(VpnKey.user_id, func.count(VpnKey.id))
-            .where(VpnKey.user_id.in_(user_ids))
-            .group_by(VpnKey.user_id)
-        )
-        return {int(user_id): int(count) for user_id, count in result.all()}
-
     async def refresh_traffic_for_keys(self, keys: list[VpnKey]) -> None:
         if not keys:
             return
@@ -305,6 +295,7 @@ class VpnKeyService:
                     data_limit_gb=data_limit_gb,
                 )
                 log.info(f"Remnawave provisioned {username} (attempt {attempt + 1})")
+                await self._assign_vpn_groups(panel_user)
                 return panel_user
             except Exception as e:
                 last_error = e
@@ -315,6 +306,49 @@ class VpnKeyService:
                     await asyncio.sleep(0.5 * (attempt + 1))
         log.error(f"All 3 Remnawave attempts failed for {username}: {last_error}")
         return None
+
+    async def _assign_vpn_groups(self, panel_user: dict) -> None:
+        from app.services.bot_settings import BotSettingsService, parse_int_list_setting
+
+        async with AsyncSessionFactory() as settings_session:
+            raw = await BotSettingsService(settings_session).get("vpn_group_ids")
+        group_ids = parse_int_list_setting(raw) if raw else []
+
+        if not group_ids:
+            try:
+                all_groups = await self._get_panel().get_groups()
+                if all_groups:
+                    first = all_groups[0]
+                    gid = first.get("id")
+                    if gid is not None:
+                        group_ids = [gid]
+                        log.info(
+                            f"[_assign_vpn_groups] no groups selected, "
+                            f"using first available: {gid}"
+                        )
+                else:
+                    log.warning(
+                        "[_assign_vpn_groups] no groups selected and "
+                        "no groups found in Remnawave"
+                    )
+                    return
+            except Exception as e:
+                log.warning(f"[_assign_vpn_groups] failed to fetch groups: {e}")
+                return
+
+        user_uuid = panel_user.get("uuid")
+        if not user_uuid:
+            log.warning(
+                "[_assign_vpn_groups] no uuid in panel_user response, "
+                "cannot assign groups"
+            )
+            return
+
+        result = await self._get_panel().assign_groups(user_uuid, group_ids)
+        if result is not None:
+            log.info(
+                f"[_assign_vpn_groups] assigned groups {group_ids} to {user_uuid}"
+            )
 
     def _set_access_url(self, key: VpnKey, panel_user: dict) -> None:
         sub_url = panel_user.get("subscriptionUrl", "")

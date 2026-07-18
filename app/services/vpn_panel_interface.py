@@ -64,3 +64,13 @@ class VpnPanelInterface(ABC):
     async def get_hosts(self) -> list[dict]:
         """Return list of VPN hosts/servers."""
         ...
+
+    async def get_groups(self) -> list[dict]:
+        """Return list of VPN groups."""
+        return []
+
+    async def assign_groups(
+        self, user_uuid: str, group_ids: list[int]
+    ) -> dict | None:
+        """Assign groups to a user. Returns response or None."""
+        return None

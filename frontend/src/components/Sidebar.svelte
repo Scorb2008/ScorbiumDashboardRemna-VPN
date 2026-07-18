@@ -35,6 +35,7 @@
       label: 'Инфраструктура',
       items: [
         { path: '/remnawave', label: 'Remnawave', icon: 'server' },
+        { path: '/groups', label: 'Группы VPN', icon: 'shield' },
         { path: '/telegram', label: 'Telegram', icon: 'bot' },
       ],
     },

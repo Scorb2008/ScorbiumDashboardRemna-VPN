@@ -5,14 +5,13 @@ from aiogram.types import CallbackQuery
 
 from app.core.database import AsyncSessionFactory
 from app.services.user import UserService
-from app.services.bot_settings import BotSettingsService, parse_int_list_setting
+from app.services.bot_settings import BotSettingsService
 from app.services.vpn_key import VpnKeyService
 from app.services.i18n import t, get_lang
 from app.bot.utils.menu import get_main_menu_kb as _get_menu_kb
 from app.bot.handlers.admin import _is_admin
 from app.bot.utils.subscription_links import subscription_link_kb
 from app.utils.html_utils import html_code
-from app.utils.log import log
 
 router = Router()
 
@@ -62,57 +61,17 @@ async def handle_trial(callback: CallbackQuery) -> None:
                 pass
             return
 
-        from datetime import datetime, timezone, timedelta
-        from app.models.vpn_key import VpnKey, VpnKeyStatus
-        from app.services.remnawave.remnawave_api import get_vpn_panel
-        from app.core.config import config
+        trial_name = {
+            "ru": f"Пробный период ({trial_days} дн.)",
+            "en": f"Trial ({trial_days} days)",
+            "fa": f"آزمایشی ({trial_days} روز)",
+        }.get(lang, f"Trial ({trial_days} days)")
 
-        trial_days = int(settings.get("trial_days", "3"))
-        expires_at = datetime.now(timezone.utc) + timedelta(days=trial_days)
-
-        key = VpnKey(
+        key = await VpnKeyService(session).provision_days(
             user_id=callback.from_user.id,
-            plan_id=None,
-            price=0,
-            expires_at=expires_at,
-            name={
-                "ru": f"Пробный период ({trial_days} дн.)",
-                "en": f"Trial ({trial_days} days)",
-                "fa": f"آزمایشی ({trial_days} روز)",
-            }.get(lang, f"Trial ({trial_days} days)"),
-            status=VpnKeyStatus.ACTIVE.value,
-            access_url="pending",
+            days=trial_days,
+            name=trial_name,
         )
-        session.add(key)
-        await session.flush()
-
-        # Создаём в Remnawave
-        username = f"trial_{callback.from_user.id}_{key.id}"
-        try:
-            panel = get_vpn_panel()
-            panel_user = await panel.create_user(
-                username=username,
-                expire_days=trial_days,
-                data_limit_gb=0,
-            )
-            sub_url = panel_user.get("subscriptionUrl", "")
-            if sub_url:
-                key.access_url = sub_url.rstrip("/")
-            else:
-                base = str(config.remnawave.remnawave_admin_panel).rstrip("/")
-                key.access_url = f"{base}/sub/{username}/"
-
-            key.remnawave_key_id = username
-        except Exception as e:
-            log.error(f"Trial Remnawave error for user {callback.from_user.id}: {e}")
-            await session.delete(key)
-            await session.flush()
-            try:
-                await callback.answer(t("key_error", lang), show_alert=True)
-            except Exception:
-                pass
-            return
-
         await session.commit()
 
     if not key:
