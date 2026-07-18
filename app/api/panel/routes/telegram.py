@@ -628,7 +628,7 @@ async def telegram_groups_page(request: Request, db: AsyncSession = Depends(get_
     ctx = await _base_ctx(request, db, "telegram")
     ctx["bot_settings"] = await BotSettingsService(db).get_all()
     ctx["selected_group_ids"] = parse_int_list_setting(
-        ctx["bot_settings"].get("vpn_group_ids")
+        ctx["bot_settings"].get("vpn_squad_ids")
     )
     try:
         from app.services.remnawave.remnawave_api import get_vpn_panel
@@ -650,11 +650,11 @@ async def save_telegram_groups(
     _require_permission(request, "system")
     svc = BotSettingsService(db)
     normalized_group_ids = parse_int_list_setting(group_ids)
-    await svc.set("vpn_group_ids", _json.dumps(normalized_group_ids))
+    await svc.set("vpn_squad_ids", _json.dumps(normalized_group_ids))
     await svc.set("required_channel_name", group_name.strip())
     await db.commit()
     resp = Response(status_code=200)
-    _toast(resp, "Настройки групп сохранены")
+    _toast(resp, "Настройки сквадов сохранены")
     return resp
 
 

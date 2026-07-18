@@ -18,7 +18,7 @@
   import Broadcasts from './pages/Broadcasts.svelte';
   import Referrals from './pages/Referrals.svelte';
   import Telegram from './pages/Telegram.svelte';
-  import Groups from './pages/Groups.svelte';
+  import Squads from './pages/Squads.svelte';
   import Settings from './pages/Settings.svelte';
   import Database from './pages/Database.svelte';
   import Admins from './pages/Admins.svelte';
@@ -147,8 +147,8 @@
             <Referrals />
           {:else if currentPath === '/telegram'}
             <Telegram />
-          {:else if currentPath === '/groups'}
-            <Groups />
+          {:else if currentPath === '/squads'}
+            <Squads />
           {:else if currentPath === '/settings'}
             <Settings />
           {:else if currentPath === '/database'}

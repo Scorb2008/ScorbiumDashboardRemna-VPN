@@ -170,7 +170,7 @@ def admin_kb(panel_url: str = "", maintenance: bool = False) -> InlineKeyboardMa
         InlineKeyboardButton(text="📢 Рассылка", callback_data="adm:broadcast"),
     )
     builder.row(
-        InlineKeyboardButton(text="🌐 Группы VPN", callback_data="adm:groups"),
+        InlineKeyboardButton(text="🌐 Сквады", callback_data="adm:squads"),
         InlineKeyboardButton(text="🖥 Ноды", callback_data="adm:nodes"),
     )
     builder.row(
@@ -562,7 +562,7 @@ async def _show_admin_key_hwids(
         pass
 
 
-async def _show_groups(callback: CallbackQuery, saved_ids: list[int]) -> None:
+async def _show_squads(callback: CallbackQuery, saved_ids: list[int]) -> None:
     from app.services.remnawave.remnawave_api import RemnawaveService
 
     try:
@@ -573,7 +573,7 @@ async def _show_groups(callback: CallbackQuery, saved_ids: list[int]) -> None:
     if not groups:
         try:
             await callback.message.edit_text(
-                "🌐 <b>Группы VPN</b>\n\n❌ Не удалось загрузить группы из Remnawave.",
+                "🌐 <b>Сквады</b>\n\n❌ Не удалось загрузить сквады из Remnawave.",
                 reply_markup=_back_admin_kb(),
                 parse_mode="HTML",
             )
@@ -582,8 +582,8 @@ async def _show_groups(callback: CallbackQuery, saved_ids: list[int]) -> None:
         return
 
     lines = [
-        "🌐 <b>Группы VPN (Remnawave)</b>\n",
-        "Нажми на группу чтобы включить/выключить:\n",
+        "🌐 <b>Сквады (Remnawave)</b>\n",
+        "Нажми на скваду чтобы включить/выключить:\n",
     ]
     builder = InlineKeyboardBuilder()
     for g in groups:
@@ -593,7 +593,7 @@ async def _show_groups(callback: CallbackQuery, saved_ids: list[int]) -> None:
         builder.row(
             InlineKeyboardButton(
                 text=f"{icon} {g['name']}{disabled} ({g.get('total_users', 0)} юз.)",
-                callback_data=f"adm:group:toggle:{gid}",
+                callback_data=f"adm:squad:toggle:{gid}",
             )
         )
         inbounds = ", ".join(g.get("inbound_tags", []))
@@ -602,7 +602,7 @@ async def _show_groups(callback: CallbackQuery, saved_ids: list[int]) -> None:
     lines.append(
         f"\n💾 Активные: <code>{saved_ids}</code>"
         if saved_ids
-        else "\n⚠️ Группы не выбраны"
+        else "\n⚠️ Сквады не выбраны"
     )
     builder.row(InlineKeyboardButton(text="◀️ Назад", callback_data="adm:back"))
     try:
@@ -2771,7 +2771,7 @@ def admin_kb_extended(
         InlineKeyboardButton(text="📢 Рассылка", callback_data="adm:broadcast"),
     )
     builder.row(
-        InlineKeyboardButton(text="🌐 Группы VPN", callback_data="adm:groups"),
+        InlineKeyboardButton(text="🌐 Сквады", callback_data="adm:squads"),
         InlineKeyboardButton(text="🖥 Ноды", callback_data="adm:nodes"),
     )
     builder.row(
@@ -3515,15 +3515,15 @@ async def admin_referrals(callback: CallbackQuery) -> None:
 # ── Groups ────────────────────────────────────────────────────────────────────
 
 
-@router.callback_query(F.data == "adm:groups")
-async def admin_groups(callback: CallbackQuery) -> None:
+@router.callback_query(F.data == "adm:squads")
+async def admin_squads(callback: CallbackQuery) -> None:
     if not _is_admin(callback.from_user.id):
         await callback.answer("⛔ Нет доступа", show_alert=True)
         return
     await callback.answer()
 
     async with AsyncSessionFactory() as session:
-        saved_raw = await BotSettingsService(session).get("vpn_group_ids")
+        saved_raw = await BotSettingsService(session).get("vpn_squad_ids")
 
     saved_ids: list[int] = []
     try:
@@ -3532,7 +3532,7 @@ async def admin_groups(callback: CallbackQuery) -> None:
     except Exception:
         pass
 
-    await _show_groups(callback, saved_ids)
+    await _show_squads(callback, saved_ids)
 
 
 @router.callback_query(F.data == "adm:nodes")
@@ -3562,8 +3562,8 @@ async def admin_node_reconnect(callback: CallbackQuery) -> None:
     await _show_nodes(callback)
 
 
-@router.callback_query(F.data.startswith("adm:group:toggle:"))
-async def admin_group_toggle(callback: CallbackQuery) -> None:
+@router.callback_query(F.data.startswith("adm:squad:toggle:"))
+async def admin_squad_toggle(callback: CallbackQuery) -> None:
     if not _is_admin(callback.from_user.id):
         return
 
@@ -3571,7 +3571,7 @@ async def admin_group_toggle(callback: CallbackQuery) -> None:
 
     async with AsyncSessionFactory() as session:
         svc = BotSettingsService(session)
-        saved_raw = await svc.get("vpn_group_ids")
+        saved_raw = await svc.get("vpn_squad_ids")
         saved_ids: list[int] = []
         try:
             if saved_raw:
@@ -3586,11 +3586,11 @@ async def admin_group_toggle(callback: CallbackQuery) -> None:
             saved_ids.append(gid)
             action = "добавлена"
 
-        await svc.set("vpn_group_ids", _json.dumps(saved_ids))
+        await svc.set("vpn_squad_ids", _json.dumps(saved_ids))
         await session.commit()
 
-    await callback.answer(f"Группа {gid} {action}", show_alert=False)
-    await _show_groups(callback, saved_ids)
+    await callback.answer(f"Сквада {gid} {action}", show_alert=False)
+    await _show_squads(callback, saved_ids)
 
 
 # ── Commands ──────────────────────────────────────────────────────────────────

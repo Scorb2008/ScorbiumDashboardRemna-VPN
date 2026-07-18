@@ -158,10 +158,10 @@ class ApiClient {
   getBotDescription(languageCode = 'ru') { return this.get('/telegram/get-description', { language_code: languageCode }); }
   refreshWebhook() { return this.post('/telegram/refresh-webhook'); }
 
-  // VPN Groups
-  getVpnGroups() { return this.get('/telegram/groups'); }
-  getSelectedVpnGroups() { return this.get('/telegram/groups/selected'); }
-  saveSelectedVpnGroups(groupIds) { return this.post('/telegram/groups/selected', { group_ids: groupIds }); }
+  // VPN Squads
+  getVpnSquads() { return this.get('/telegram/squads'); }
+  getSelectedVpnSquads() { return this.get('/telegram/squads/selected'); }
+  saveSelectedVpnSquads(squadIds) { return this.post('/telegram/squads/selected', { squad_ids: squadIds }); }
 
   // Referrals
   getReferralStats() { return this.get('/referrals/stats'); }

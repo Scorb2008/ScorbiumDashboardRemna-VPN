@@ -205,12 +205,12 @@ async def refresh_webhook(
 # ── VPN Groups ────────────────────────────────────────────────────────────────
 
 
-class SaveGroupsBody(BaseModel):
-    group_ids: list[int] = []
+class SaveSquadsBody(BaseModel):
+    squad_ids: list[int] = []
 
 
-@router.get("/groups", summary="List Remnawave VPN groups")
-async def list_groups(
+@router.get("/squads", summary="List Remnawave VPN squads")
+async def list_squads(
     _: str = Depends(get_current_admin),
 ) -> dict:
     from app.services.remnawave.remnawave_api import RemnawaveService
@@ -220,30 +220,30 @@ async def list_groups(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Failed to fetch groups from Remnawave: {e}",
+            detail=f"Failed to fetch squads from Remnawave: {e}",
         )
-    return {"groups": groups}
+    return {"squads": groups}
 
 
-@router.get("/groups/selected", summary="Get selected VPN group IDs")
-async def get_selected_groups(
+@router.get("/squads/selected", summary="Get selected VPN squad IDs")
+async def get_selected_squads(
     db=Depends(get_db),
     _: str = Depends(get_current_admin),
 ) -> dict:
     svc = BotSettingsService(db)
-    raw = await svc.get("vpn_group_ids")
-    return {"group_ids": parse_int_list_setting(raw) if raw else []}
+    raw = await svc.get("vpn_squad_ids")
+    return {"squad_ids": parse_int_list_setting(raw) if raw else []}
 
 
-@router.post("/groups/selected", summary="Save selected VPN group IDs")
-async def save_selected_groups(
-    body: SaveGroupsBody,
+@router.post("/squads/selected", summary="Save selected VPN squad IDs")
+async def save_selected_squads(
+    body: SaveSquadsBody,
     db=Depends(get_db),
     _: str = Depends(get_current_admin),
 ) -> dict:
     import json
 
     svc = BotSettingsService(db)
-    await svc.set("vpn_group_ids", json.dumps(body.group_ids))
+    await svc.set("vpn_squad_ids", json.dumps(body.squad_ids))
     await db.commit()
-    return {"ok": True, "group_ids": body.group_ids}
+    return {"ok": True, "squad_ids": body.squad_ids}

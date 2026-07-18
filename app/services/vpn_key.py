@@ -295,7 +295,7 @@ class VpnKeyService:
                     data_limit_gb=data_limit_gb,
                 )
                 log.info(f"Remnawave provisioned {username} (attempt {attempt + 1})")
-                await self._assign_vpn_groups(panel_user)
+                await self._assign_vpn_squads(panel_user)
                 return panel_user
             except Exception as e:
                 last_error = e
@@ -307,11 +307,11 @@ class VpnKeyService:
         log.error(f"All 3 Remnawave attempts failed for {username}: {last_error}")
         return None
 
-    async def _assign_vpn_groups(self, panel_user: dict) -> None:
+    async def _assign_vpn_squads(self, panel_user: dict) -> None:
         from app.services.bot_settings import BotSettingsService, parse_int_list_setting
 
         async with AsyncSessionFactory() as settings_session:
-            raw = await BotSettingsService(settings_session).get("vpn_group_ids")
+            raw = await BotSettingsService(settings_session).get("vpn_squad_ids")
         group_ids = parse_int_list_setting(raw) if raw else []
 
         if not group_ids:
@@ -323,31 +323,31 @@ class VpnKeyService:
                     if gid is not None:
                         group_ids = [gid]
                         log.info(
-                            f"[_assign_vpn_groups] no groups selected, "
+                            f"[_assign_vpn_squads] no squads selected, "
                             f"using first available: {gid}"
                         )
                 else:
                     log.warning(
-                        "[_assign_vpn_groups] no groups selected and "
-                        "no groups found in Remnawave"
+                        "[_assign_vpn_squads] no squads selected and "
+                        "no squads found in Remnawave"
                     )
                     return
             except Exception as e:
-                log.warning(f"[_assign_vpn_groups] failed to fetch groups: {e}")
+                log.warning(f"[_assign_vpn_squads] failed to fetch squads: {e}")
                 return
 
         user_uuid = panel_user.get("uuid")
         if not user_uuid:
             log.warning(
-                "[_assign_vpn_groups] no uuid in panel_user response, "
-                "cannot assign groups"
+                "[_assign_vpn_squads] no uuid in panel_user response, "
+                "cannot assign squads"
             )
             return
 
         result = await self._get_panel().assign_groups(user_uuid, group_ids)
         if result is not None:
             log.info(
-                f"[_assign_vpn_groups] assigned groups {group_ids} to {user_uuid}"
+                f"[_assign_vpn_squads] assigned squads {group_ids} to {user_uuid}"
             )
 
     def _set_access_url(self, key: VpnKey, panel_user: dict) -> None:

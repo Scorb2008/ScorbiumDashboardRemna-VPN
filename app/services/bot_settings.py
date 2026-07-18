@@ -47,7 +47,7 @@ DEFAULTS = {
     "unban_message": "✅ Ваш аккаунт разблокирован. Добро пожаловать обратно!",
     "bot_enabled": "1",
     "about_text": "",
-    "vpn_group_ids": "",
+    "vpn_squad_ids": "",
     "required_channel_id": "",
     "required_channel_name": "",
     # ── Фото для разделов бота ────────────────────────────────────────────────

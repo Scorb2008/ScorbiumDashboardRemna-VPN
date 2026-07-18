@@ -328,7 +328,7 @@
               </button>
               <button type="submit" class="btn btn-sm btn-accent"><i class="bi bi-floppy me-1"></i>Сохранить</button>
             </div>
-            {% set sg = bot_settings.get('vpn_group_ids', '') %}
+            {% set sg = bot_settings.get('vpn_squad_ids', '') %}
             {% if sg and sg != '[]' %}
             <div class="mt-2" style="font-size:.72rem;color:var(--success)">
               <i class="bi bi-check-circle me-1"></i>Активно: <code>{{ sg }}</code>
