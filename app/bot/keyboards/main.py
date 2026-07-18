@@ -62,20 +62,23 @@ def main_menu_kb(
             style = styles.get(bid) or None
             emoji_id = emojis.get(bid) or None
 
-            if web_app_url:
-                row_btns.append(
-                    btn(label, web_app=web_app_url, style=style, emoji_id=emoji_id)
-                )
-            elif url:
-                row_btns.append(btn(label, url=url, style=style, emoji_id=emoji_id))
-            elif bid == "support" and support_url:
-                row_btns.append(
-                    btn(label, url=support_url, style=style, emoji_id=emoji_id)
-                )
-            elif callback:
-                row_btns.append(
-                    btn(label, callback_data=callback, style=style, emoji_id=emoji_id)
-                )
+            try:
+                if web_app_url:
+                    row_btns.append(
+                        btn(label, web_app=web_app_url, style=style, emoji_id=emoji_id)
+                    )
+                elif url:
+                    row_btns.append(btn(label, url=url, style=style, emoji_id=emoji_id))
+                elif bid == "support" and support_url:
+                    row_btns.append(
+                        btn(label, url=support_url, style=style, emoji_id=emoji_id)
+                    )
+                elif callback:
+                    row_btns.append(
+                        btn(label, callback_data=callback, style=style, emoji_id=emoji_id)
+                    )
+            except Exception:
+                continue
 
         if not row_btns:
             continue

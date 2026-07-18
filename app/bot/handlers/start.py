@@ -129,19 +129,28 @@ async def cmd_start(message: Message) -> None:
         welcome_tpl = settings.get("welcome_message")
         user_lang = user.language if user and user.language else None
         lang = get_lang(settings, user_lang)
-        kb = await _get_menu_kb(
-            session,
-            lang=lang,
-            user_id=message.from_user.id,
-            is_admin=_is_admin(message.from_user.id),
-        )
+        try:
+            kb = await _get_menu_kb(
+                session,
+                lang=lang,
+                user_id=message.from_user.id,
+                is_admin=_is_admin(message.from_user.id),
+            )
+        except Exception:
+            kb = None
         photo = settings.get("photo_welcome")
 
     if welcome_tpl:
-        welcome = welcome_tpl.format(name=message.from_user.first_name)
-        if not created:
+        try:
+            welcome = welcome_tpl.format(name=message.from_user.first_name)
+        except Exception:
+            welcome = None
+        if not created and not welcome:
             welcome = t("welcome_back", lang, name=message.from_user.first_name)
     else:
+        welcome = None
+
+    if not welcome:
         welcome = t(
             "welcome" if created else "welcome_back",
             lang,
@@ -157,6 +166,26 @@ async def cmd_start(message: Message) -> None:
             await message.answer(welcome, parse_mode="HTML")
         except Exception:
             pass
+
+
+@router.callback_query(F.data == "channel:check")
+async def channel_check_callback(callback: CallbackQuery) -> None:
+    from app.bot.utils.media import edit_with_photo
+
+    async with AsyncSessionFactory() as session:
+        lang = await _get_lang_from_session(callback.from_user.id, session)
+        kb = await _get_menu_kb(
+            session,
+            lang=lang,
+            user_id=callback.from_user.id,
+            is_admin=_is_admin(callback.from_user.id),
+        )
+        photo = await BotSettingsService(session).get("photo_welcome")
+
+    await edit_with_photo(
+        callback, t("main_menu", lang), reply_markup=kb, photo=photo or None
+    )
+    await _safe_answer(callback)
 
 
 @router.callback_query(F.data == "back_main")
