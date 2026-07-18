@@ -150,7 +150,13 @@ async def cmd_start(message: Message) -> None:
 
     from app.bot.utils.media import answer_with_photo
 
-    await answer_with_photo(message, welcome, reply_markup=kb, photo=photo or None)
+    try:
+        await answer_with_photo(message, welcome, reply_markup=kb, photo=photo or None)
+    except Exception:
+        try:
+            await message.answer(welcome, parse_mode="HTML")
+        except Exception:
+            pass
 
 
 @router.callback_query(F.data == "back_main")

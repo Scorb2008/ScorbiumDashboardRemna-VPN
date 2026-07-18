@@ -95,16 +95,11 @@ async def answer_with_photo(
             )
         except TelegramBadRequest:
             pass
-        except Exception:
-            pass
-    try:
-        return await message.answer(
-            text=text,
-            reply_markup=reply_markup,
-            parse_mode=parse_mode,
-        )
-    except Exception:
-        return None
+    return await message.answer(
+        text=text,
+        reply_markup=reply_markup,
+        parse_mode=parse_mode,
+    )
 
 
 async def edit_with_photo(
@@ -116,16 +111,10 @@ async def edit_with_photo(
 ) -> None:
     """
     Редактирует текущее сообщение или отправляет новое.
-    Полностью безопасна — никогда не бросает исключения.
+    Безопасно обрабатывает все ошибки Telegram API.
     """
     msg = callback.message
     if msg is None:
-        try:
-            await callback.message.chat.send_message(
-                text=text, reply_markup=reply_markup, parse_mode=parse_mode
-            )
-        except Exception:
-            pass
         return
 
     chat = msg.chat

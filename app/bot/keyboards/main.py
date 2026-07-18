@@ -46,12 +46,16 @@ def main_menu_kb(
     builder = InlineKeyboardBuilder()
 
     for row in layout:
-        if not row:
+        if not row or not isinstance(row, list):
             continue
         row_btns = []
         for b in row:
+            if not isinstance(b, dict):
+                continue
             bid = b.get("id", "")
             label = b.get("label", "")
+            if not label:
+                continue
             callback = b.get("callback", bid)
             url = b.get("url", "")
             web_app_url = b.get("web_app", "")
@@ -68,15 +72,22 @@ def main_menu_kb(
                 row_btns.append(
                     btn(label, url=support_url, style=style, emoji_id=emoji_id)
                 )
-            else:
+            elif callback:
                 row_btns.append(
                     btn(label, callback_data=callback, style=style, emoji_id=emoji_id)
                 )
 
+        if not row_btns:
+            continue
         if len(row_btns) == 1:
             builder.row(row_btns[0])
         else:
             builder.row(*row_btns)
+
+    if not builder.rows:
+        builder.row(
+            InlineKeyboardButton(text="🏠 Меню", callback_data="back_main")
+        )
 
     return builder.as_markup()
 

@@ -109,8 +109,12 @@ def _translate_layout(layout: list, lang: str, settings: dict) -> list:
     """Translate button labels in layout based on user language, with admin overrides."""
     result = []
     for row in layout:
+        if not row or not isinstance(row, list):
+            continue
         new_row = []
         for b in row:
+            if not isinstance(b, dict) or not b.get("label"):
+                continue
             bid = b.get("id", "")
             override = settings.get(f"i18n_{lang}_btn_{bid}", "").strip()
             if not override:
@@ -120,7 +124,8 @@ def _translate_layout(layout: list, lang: str, settings: dict) -> list:
             )
             label = override if override else default_label
             new_row.append({**b, "label": label})
-        result.append(new_row)
+        if new_row:
+            result.append(new_row)
     return result
 
 
@@ -128,8 +133,12 @@ def _resolve_layout_urls(layout: list, settings: dict, is_admin: bool) -> list:
     """Resolve cabinet and admin_panel URLs, remove if no URL, hide admin-only buttons."""
     result = []
     for row in layout:
+        if not row or not isinstance(row, list):
+            continue
         new_row = []
         for b in row:
+            if not isinstance(b, dict):
+                continue
             bid = b.get("id", "")
             if bid == "cabinet":
                 url = _resolve_url(settings, "cabinet_url", "/cabinet/")
@@ -155,8 +164,12 @@ def _resolve_layout_menu(layout: list, is_admin: bool) -> list:
     """Normalize admin menu button callback and hide it for non-admins."""
     result = []
     for row in layout:
+        if not row or not isinstance(row, list):
+            continue
         new_row = []
         for b in row:
+            if not isinstance(b, dict):
+                continue
             bid = b.get("id", "")
             if bid == "admin_menu":
                 if not is_admin:
