@@ -48,9 +48,10 @@ async def remnawave_proxy(
         if method in ("post", "put", "patch"):
             body = await request.json()
         params = dict(request.query_params) or None
+        api_path = f"/{path}" if not path.startswith("/") else path
         result = await client._request(
             method.upper(),
-            f"/api/{path}",
+            api_path,
             json=body,
             params=params,
         )
