@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { api } from '../lib/api.svelte.js';
   import { toasts } from '../lib/stores.js';
-  import { formatDate, formatDateTime, formatPrice } from '../lib/utils.js';
+  import { formatDate, formatDateTime, formatPrice, esc } from '../lib/utils.js';
   import Table from '../components/Table.svelte';
   import Modal from '../components/Modal.svelte';
   import Spinner from '../components/Spinner.svelte';
@@ -179,7 +179,7 @@
 
   const columns = [
     { key: 'id', label: 'ID', sortable: true },
-    { key: 'username', label: 'Username', sortable: true, render: (r) => `<span class="font-mono text-xs text-zinc-400">@${r.username || '—'}</span>` },
+    { key: 'username', label: 'Username', sortable: true, render: (r) => `<span class="font-mono text-xs text-zinc-400">@${esc(r.username) || '—'}</span>` },
     { key: 'full_name', label: 'Имя', sortable: true },
     { key: 'balance', label: 'Баланс', sortable: true, render: (r) => `<span class="text-xs font-medium">${formatPrice(r.balance ?? 0)}</span>` },
     { key: 'created_at', label: 'Создан', sortable: true, render: (r) => `<span class="text-xs text-muted">${formatDate(r.created_at)}</span>` },

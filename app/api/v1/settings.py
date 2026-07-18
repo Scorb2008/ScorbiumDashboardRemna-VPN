@@ -1,6 +1,6 @@
 """REST API endpoints for settings and configuration."""
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 from typing import Optional
@@ -10,6 +10,23 @@ from app.core.config import config
 from app.services.bot_settings import BotSettingsService
 
 router = APIRouter()
+
+_SENSITIVE_KEYS = frozenset({
+    "yookassa_secret_key_override",
+    "cryptobot_token",
+    "freekassa_api_key",
+    "freekassa_secret_word_1",
+    "freekassa_secret_word_2",
+    "aikassa_token",
+    "platega_secret",
+    "paypalych_api_token",
+})
+
+
+def _mask(value: str) -> str:
+    if not value or len(value) <= 4:
+        return "****"
+    return value[:2] + "*" * (len(value) - 4) + value[-2:]
 
 
 class PaymentSystemConfig(BaseModel):
@@ -31,7 +48,7 @@ async def get_settings(
 ):
     svc = BotSettingsService(db)
     settings = await svc.get_all()
-    return settings
+    return {k: _mask(v) if k in _SENSITIVE_KEYS else v for k, v in settings.items()}
 
 
 @router.patch("/")
@@ -77,39 +94,35 @@ async def get_payment_systems_detail(
         if key.endswith("_enabled"):
             systems[name]["enabled"] = val == "1"
         else:
-            systems[name]["config"][key.replace(f"ps_{name}_", "")] = val
+            config_key = key.replace(f"ps_{name}_", "")
+            systems[name]["config"][config_key] = val
 
-    # Add additional config keys per payment system
+    # Add additional config keys per payment system (mask sensitive values)
     for name in systems:
         if name == "yookassa":
+            raw = settings.get("yookassa_secret_key_override", "")
             systems[name]["config"]["shop_id"] = settings.get("yookassa_shop_id", "")
-            systems[name]["config"]["secret_key"] = settings.get(
-                "yookassa_secret_key_override", ""
-            )
+            systems[name]["config"]["secret_key"] = _mask(raw) if raw else ""
         elif name == "cryptobot":
-            systems[name]["config"]["token"] = settings.get("cryptobot_token", "")
+            raw = settings.get("cryptobot_token", "")
+            systems[name]["config"]["token"] = _mask(raw) if raw else ""
             systems[name]["config"]["rate"] = settings.get("stars_rate", "1.5")
         elif name == "freekassa":
             systems[name]["config"]["shop_id"] = settings.get("freekassa_shop_id", "")
-            systems[name]["config"]["api_key"] = settings.get("freekassa_api_key", "")
-            systems[name]["config"]["secret_word_1"] = settings.get(
-                "freekassa_secret_word_1", ""
-            )
-            systems[name]["config"]["secret_word_2"] = settings.get(
-                "freekassa_secret_word_2", ""
-            )
+            systems[name]["config"]["api_key"] = _mask(settings.get("freekassa_api_key", ""))
+            systems[name]["config"]["secret_word_1"] = _mask(settings.get("freekassa_secret_word_1", ""))
+            systems[name]["config"]["secret_word_2"] = _mask(settings.get("freekassa_secret_word_2", ""))
         elif name == "aikassa":
+            raw = settings.get("aikassa_token", "")
             systems[name]["config"]["shop_id"] = settings.get("aikassa_shop_id", "")
-            systems[name]["config"]["token"] = settings.get("aikassa_token", "")
+            systems[name]["config"]["token"] = _mask(raw) if raw else ""
         elif name == "platega":
-            systems[name]["config"]["merchant_id"] = settings.get(
-                "platega_merchant_id", ""
-            )
-            systems[name]["config"]["secret"] = settings.get("platega_secret", "")
+            raw = settings.get("platega_secret", "")
+            systems[name]["config"]["merchant_id"] = settings.get("platega_merchant_id", "")
+            systems[name]["config"]["secret"] = _mask(raw) if raw else ""
         elif name == "paypalych":
-            systems[name]["config"]["api_token"] = settings.get(
-                "paypalych_api_token", ""
-            )
+            raw = settings.get("paypalych_api_token", "")
+            systems[name]["config"]["api_token"] = _mask(raw) if raw else ""
 
     return systems
 

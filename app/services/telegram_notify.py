@@ -105,15 +105,26 @@ class TelegramNotifyService:
         user_ids: list[int],
         text: str,
         parse_mode: str = "HTML",
+        concurrency: int = 20,
     ) -> tuple[int, int]:
-        """Returns (sent_count, failed_count)."""
+        """Returns (sent_count, failed_count). Sends concurrently with a semaphore."""
+        import asyncio
+
+        sem = asyncio.Semaphore(concurrency)
         sent, failed = 0, 0
-        for uid in user_ids:
-            ok = await self.send_message(uid, text, parse_mode)
-            if ok:
-                sent += 1
-            else:
+
+        async def _send_one(uid: int) -> bool:
+            async with sem:
+                return await self.send_message(uid, text, parse_mode)
+
+        results = await asyncio.gather(
+            *[_send_one(uid) for uid in user_ids], return_exceptions=True
+        )
+        for r in results:
+            if isinstance(r, Exception) or r is False:
                 failed += 1
+            else:
+                sent += 1
         return sent, failed
 
     async def get_bot_info(self) -> Optional[dict]:

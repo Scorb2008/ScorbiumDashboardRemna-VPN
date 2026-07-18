@@ -675,14 +675,31 @@ async def cryptobot_webhook(
                 )
             return {"ok": True}
 
-        parts = payload_raw.split("_")
-        if len(parts) >= 3 and parts[0] == "cb":
-            payment_id = int(parts[1])
-            plan_id = int(parts[2])
-            extend_key_id = int(parts[3]) if len(parts) > 3 else None
+        if payload_raw.startswith("extend_crypto:"):
+            ext_parts = payload_raw.split(":")
+            if len(ext_parts) < 4:
+                log.error(f"CryptoBot webhook: invalid extend_crypto payload: {payload_raw}")
+                return {"ok": True}
+            payment_id = int(ext_parts[1])
+            plan_id = int(ext_parts[2])
+            extend_key_id = int(ext_parts[3])
+        elif payload_raw.startswith("crypto:"):
+            crypto_parts = payload_raw.split(":")
+            if len(crypto_parts) < 3:
+                log.error(f"CryptoBot webhook: invalid crypto payload: {payload_raw}")
+                return {"ok": True}
+            payment_id = int(crypto_parts[1])
+            plan_id = int(crypto_parts[2])
+            extend_key_id = None
         else:
-            log.error(f"CryptoBot webhook: unknown payload format: {payload_raw}")
-            return {"ok": True}
+            parts = payload_raw.split("_")
+            if len(parts) >= 3 and parts[0] == "cb":
+                payment_id = int(parts[1])
+                plan_id = int(parts[2])
+                extend_key_id = int(parts[3]) if len(parts) > 3 else None
+            else:
+                log.error(f"CryptoBot webhook: unknown payload format: {payload_raw}")
+                return {"ok": True}
 
         (
             payment,

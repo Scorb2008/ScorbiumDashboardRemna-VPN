@@ -493,7 +493,9 @@ class VpnKeyService:
         synced, errors, fixed_expire = 0, 0, 0
         traffic_columns_supported = await self._supports_traffic_columns()
         result = await self.session.execute(
-            select(VpnKey).where(VpnKey.remnawave_key_id.isnot(None))
+            select(VpnKey)
+            .where(VpnKey.remnawave_key_id.isnot(None))
+            .with_for_update(skip_locked=True)
         )
         for key in result.scalars().all():
             try:

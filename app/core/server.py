@@ -264,6 +264,7 @@ async def _lifespan(app: FastAPI):
     _start_bg_task(payment_polling_loop(), name="payment_polling")
     _start_bg_task(expire_loop(), name="expire_loop")
     _start_bg_task(sync_loop(), name="sync_loop")
+    _start_monitoring()
 
     from app.bot.middlewares.metrics import BotMetricsLoop
 

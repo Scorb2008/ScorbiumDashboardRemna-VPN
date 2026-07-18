@@ -192,7 +192,7 @@ async def auto_renew_keys() -> None:
     from decimal import Decimal
 
     now = datetime.now(timezone.utc)
-    expired_since = now - timedelta(hours=1)
+    expired_since = now - timedelta(hours=2)
 
     try:
         async with AsyncSessionFactory() as session:

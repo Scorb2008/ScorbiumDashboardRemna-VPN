@@ -49,8 +49,10 @@ async def current_admin(
 async def create_admin(
     body: dict,
     db: AsyncSession = Depends(get_db),
-    _admin=Depends(get_current_admin),
+    admin: dict = Depends(get_current_admin),
 ):
+    if admin.get("role") != "superadmin":
+        raise HTTPException(status_code=403, detail="Only superadmin can create admins")
     username = body.get("username", "").strip()
     password = body.get("password", "").strip()
     role = body.get("role", "operator")
@@ -58,6 +60,8 @@ async def create_admin(
         raise HTTPException(status_code=400, detail="Username and password required")
     if role not in ("superadmin", "manager", "operator"):
         raise HTTPException(status_code=400, detail="Invalid role")
+    if role == "superadmin":
+        raise HTTPException(status_code=403, detail="Cannot create superadmin via API")
     svc = AdminService(db)
     existing = await svc.get_by_username(username)
     if existing:
@@ -79,6 +83,8 @@ async def update_admin(
     db: AsyncSession = Depends(get_db),
     admin: dict = Depends(get_current_admin),
 ):
+    if admin.get("role") != "superadmin":
+        raise HTTPException(status_code=403, detail="Only superadmin can update admins")
     svc = AdminService(db)
     target = await svc.get_by_id(admin_id)
     if not target:
@@ -93,6 +99,8 @@ async def update_admin(
     if "password" in body and body["password"]:
         updates["password"] = body["password"]
     if "role" in body:
+        if body["role"] == "superadmin":
+            raise HTTPException(status_code=403, detail="Cannot promote to superadmin via API")
         updates["role"] = body["role"]
     if "is_active" in body:
         updates["is_active"] = body["is_active"]
@@ -110,6 +118,8 @@ async def delete_admin(
     db: AsyncSession = Depends(get_db),
     admin: dict = Depends(get_current_admin),
 ):
+    if admin.get("role") != "superadmin":
+        raise HTTPException(status_code=403, detail="Only superadmin can delete admins")
     svc = AdminService(db)
     target = await svc.get_by_id(admin_id)
     if not target:

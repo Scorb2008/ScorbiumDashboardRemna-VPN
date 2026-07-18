@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { api } from '../lib/api.svelte.js';
   import { toasts } from '../lib/stores.js';
-  import { formatPrice, formatDateTime } from '../lib/utils.js';
+  import { formatPrice, formatDateTime, esc } from '../lib/utils.js';
   import Table from '../components/Table.svelte';
   import Spinner from '../components/Spinner.svelte';
   import Icon from '../components/Icon.svelte';
@@ -35,8 +35,8 @@
   );
 
   const columns = [
-    { key: 'referrer_id', label: 'Реферер', sortable: true, render: (r) => `<div><span class="font-medium">${r.referrer_full_name || '—'}</span><br><span class="text-xs text-muted">${r.referrer_username ? '@'+r.referrer_username : 'ID: '+r.referrer_id}</span></div>` },
-    { key: 'referred_id', label: 'Приглашённый', sortable: true, render: (r) => `<div><span class="font-medium">${r.referred_full_name || '—'}</span><br><span class="text-xs text-muted">${r.referred_username ? '@'+r.referred_username : 'ID: '+r.referred_id}</span></div>` },
+    { key: 'referrer_id', label: 'Реферер', sortable: true, render: (r) => `<div><span class="font-medium">${esc(r.referrer_full_name) || '—'}</span><br><span class="text-xs text-muted">${r.referrer_username ? '@'+esc(r.referrer_username) : 'ID: '+r.referrer_id}</span></div>` },
+    { key: 'referred_id', label: 'Приглашённый', sortable: true, render: (r) => `<div><span class="font-medium">${esc(r.referred_full_name) || '—'}</span><br><span class="text-xs text-muted">${r.referred_username ? '@'+esc(r.referred_username) : 'ID: '+r.referred_id}</span></div>` },
     { key: 'earned_amount', label: 'Заработок', sortable: true, render: (r) => `<span class="font-mono text-xs">${formatPrice(r.earned_amount || 0)}</span>` },
     { key: 'created_at', label: 'Дата', sortable: true, render: (r) => `<span class="text-xs text-muted">${formatDateTime(r.created_at)}</span>` },
   ];

@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { api } from '../lib/api.svelte.js';
   import { toasts } from '../lib/stores.js';
-  import { formatPrice, formatDateTime } from '../lib/utils.js';
+  import { formatPrice, formatDateTime, esc } from '../lib/utils.js';
 
   function formatPaymentMethod(method) {
     if (!method) return '—';
@@ -60,11 +60,11 @@
 
   const columns = [
     { key: 'id', label: 'ID', sortable: true, render: (r) => `<span class="font-mono text-xs text-zinc-500">#${r.id}</span>` },
-    { key: 'user_id', label: 'Пользователь', sortable: true, render: (r) => `<div><span class="font-medium">${r.user_full_name || '—'}</span><br><span class="text-xs text-muted">${r.user_username ? '@'+r.user_username : 'ID: '+r.user_id}</span></div>` },
+    { key: 'user_id', label: 'Пользователь', sortable: true, render: (r) => `<div><span class="font-medium">${esc(r.user_full_name) || '—'}</span><br><span class="text-xs text-muted">${r.user_username ? '@'+esc(r.user_username) : 'ID: '+r.user_id}</span></div>` },
     { key: 'amount', label: 'Сумма', sortable: true, render: (r) => `<span class="font-mono text-xs">${formatPrice(r.amount)}</span>` },
     { key: 'created_at', label: 'Дата', sortable: true, render: (r) => `<span class="text-xs text-muted">${formatDateTime(r.created_at)}</span>` },
     { key: 'payment_method', label: 'Способ', sortable: true, render: (r) => `<span class="text-xs">${formatPaymentMethod(r.payment_method)}</span>` },
-    { key: 'plan_name', label: 'Тариф', sortable: true, render: (r) => `<span class="text-xs">${r.plan_name || '—'}</span>` },
+    { key: 'plan_name', label: 'Тариф', sortable: true, render: (r) => `<span class="text-xs">${esc(r.plan_name) || '—'}</span>` },
   ];
 </script>
 

@@ -92,7 +92,7 @@ class RemnawaveClient:
     ) -> dict | None:
         url = f"{self._base}{path}"
         suppressed = set(suppress_statuses or ())
-        for attempt in range(2):
+        for attempt in range(3):
             try:
                 resp = await self._client.request(
                     method, url, headers=await self._headers(), **kwargs
@@ -101,6 +101,10 @@ class RemnawaveClient:
                     async with self._lock:
                         RemnawaveClient._token = None
                         RemnawaveClient._token_expires = None
+                    continue
+                if resp.status_code >= 500 and attempt < 2:
+                    log.warning(f"Remnawave {method} {path} -> {resp.status_code}, retrying ({attempt+1}/3)")
+                    await asyncio.sleep(1 * (attempt + 1))
                     continue
                 if resp.status_code in suppressed:
                     return None
@@ -171,18 +175,20 @@ class RemnawaveService(VpnPanelInterface):
                 return None
             if value.isdigit():
                 ts = int(value)
-                return datetime.fromtimestamp(ts, tz=timezone.utc) if ts > 0 else now
+                return datetime.fromtimestamp(ts, tz=timezone.utc) if ts > 0 else None
             try:
                 parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
             except ValueError:
                 ts = float(value)
-                parsed = datetime.fromtimestamp(ts, tz=timezone.utc) if ts > 0 else now
+                parsed = datetime.fromtimestamp(ts, tz=timezone.utc) if ts > 0 else None
+            if parsed is None:
+                return None
             if parsed.tzinfo is None:
                 parsed = parsed.replace(tzinfo=timezone.utc)
             return parsed.astimezone(timezone.utc)
         except Exception as e:
             log.warning(f"[parse_expire_datetime] parse expire error: {e}")
-            return now
+            return None
 
     async def _get_user_by_username(self, username: str) -> dict | None:
         try:

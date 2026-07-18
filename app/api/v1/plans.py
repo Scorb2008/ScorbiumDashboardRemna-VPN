@@ -12,8 +12,19 @@ router = APIRouter()
 async def list_plans(
     only_active: bool = False,
     db: AsyncSession = Depends(get_db),
+    _admin: str = Depends(get_current_admin),
 ) -> list[PlanRead]:
-    """Public endpoint — used by bot to show available plans."""
+    """Admin-only endpoint — list all plans."""
+    svc = PlanService(db)
+    return await svc.get_all(only_active=only_active)
+
+
+@router.get("/public", response_model=list[PlanRead], summary="Public plans list")
+async def list_plans_public(
+    only_active: bool = True,
+    db: AsyncSession = Depends(get_db),
+) -> list[PlanRead]:
+    """Public endpoint — used by bot to show available plans. Only returns active plans."""
     svc = PlanService(db)
     return await svc.get_all(only_active=only_active)
 
