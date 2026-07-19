@@ -91,7 +91,7 @@ def main_menu_kb(
         else:
             builder.row(*row_btns)
 
-    if not builder.rows:
+    if not builder.keyboard:
         builder.row(
             InlineKeyboardButton(text="🏠 Меню", callback_data="back_main")
         )
