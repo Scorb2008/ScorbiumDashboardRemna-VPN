@@ -17,10 +17,10 @@ def btn(
         kwargs["url"] = url
     if web_app:
         kwargs["web_app"] = WebAppInfo(url=web_app)
-    if style in ("danger", "success", "primary"):
+    if style in ("primary", "secondary"):
         kwargs["style"] = style
-    if emoji_id and emoji_id.isdigit():
-        kwargs["icon_custom_emoji_id"] = emoji_id
+    if emoji_id and emoji_id.strip().isdigit():
+        kwargs["icon_custom_emoji_id"] = emoji_id.strip()
     try:
         return InlineKeyboardButton(**kwargs)
     except Exception:
