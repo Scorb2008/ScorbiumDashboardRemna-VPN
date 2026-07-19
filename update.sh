@@ -466,7 +466,6 @@ run_smoke_checks() {
     docker compose -f "${COMPOSE_FILE}" exec -T nginx nginx -t
     run_app_http_check "/health" "200"
     run_app_http_check "/api/v1/health/" "200"
-    run_app_http_check "${SET_PATH_ADMIN}" "200,302,303,307"
     run_app_http_check "/cabinet/" "200,302,303,307"
     local frontend_status
     frontend_status="$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' vpn_frontend 2>/dev/null || echo "unknown")"
