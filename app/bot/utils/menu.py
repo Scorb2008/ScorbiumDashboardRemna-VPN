@@ -189,13 +189,9 @@ async def get_main_menu_kb(
 ) -> InlineKeyboardMarkup:
     s = await BotSettingsService(session).get_all()
 
-    # Load layout (support keyboard_layout JSON, btn_order JSON, and btn_order CSV)
-    raw_layout = s.get("keyboard_layout", "")
+    # Load layout from btn_order (2D JSON array from SPA visual editor)
     raw_btn_order = s.get("btn_order", "")
-    try:
-        layout = json.loads(raw_layout) if raw_layout else None
-    except Exception:
-        layout = None
+    layout = None
 
     if not layout and raw_btn_order:
         try:

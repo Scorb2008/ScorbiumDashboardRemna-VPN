@@ -229,11 +229,19 @@
     settings[`btn_${name}`] = '';
     settings[`btn_${name}_style`] = '';
     settings[`btn_icon_${name}`] = '';
+    const newLayout = buttonLayout.map(r => [...r]);
+    for (let i = newLayout.length - 1; i >= 0; i--) {
+      newLayout[i] = newLayout[i].filter(n => n !== name);
+    }
+    buttonLayout = newLayout.filter(r => r.length > 0);
+    if (buttonLayout.length === 0) buttonLayout = [[]];
     if (editingBtn === name) editingBtn = null;
     await saveAllButtons();
+    const cleaned = buttonLayout.filter(r => r.length > 0);
+    try { await api.updateSettings({ btn_order: JSON.stringify(cleaned) }); } catch(e) {}
   }
 
-  function addButtonByPreset() {
+  async function addButtonByPreset() {
     if (!addPreset) return;
     const preset = BUTTON_PRESETS.find(b => b.name === addPreset);
     if (!preset) return;
@@ -250,6 +258,8 @@
     editingBtn = preset.name;
     addPreset = '';
     toasts.success(`Кнопка «${preset.label}» добавлена`);
+    const cleaned = buttonLayout.filter(r => r.length > 0);
+    try { await api.updateSettings({ btn_order: JSON.stringify(cleaned) }); } catch(e) {}
   }
 
   function selectButton(name) {

@@ -172,9 +172,12 @@ async def cmd_start(message: Message) -> None:
         try:
             await message.answer(welcome, parse_mode="HTML", reply_markup=kb)
         except Exception:
-            logging.getLogger(__name__).error(
-                "fallback answer also failed for user %s", message.from_user.id, exc_info=True
-            )
+            try:
+                await message.answer(welcome, reply_markup=kb)
+            except Exception:
+                logging.getLogger(__name__).error(
+                    "all answer attempts failed for user %s", message.from_user.id, exc_info=True
+                )
 
 
 @router.message(Command("debug_kb"))

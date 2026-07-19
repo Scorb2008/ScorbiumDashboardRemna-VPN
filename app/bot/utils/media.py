@@ -95,10 +95,25 @@ async def answer_with_photo(
             )
         except TelegramBadRequest:
             pass
+        try:
+            return await message.answer_photo(
+                photo=photo_input,
+                caption=text,
+                reply_markup=reply_markup,
+            )
+        except TelegramBadRequest:
+            pass
+    try:
+        return await message.answer(
+            text=text,
+            reply_markup=reply_markup,
+            parse_mode=parse_mode,
+        )
+    except TelegramBadRequest:
+        pass
     return await message.answer(
         text=text,
         reply_markup=reply_markup,
-        parse_mode=parse_mode,
     )
 
 
@@ -131,6 +146,13 @@ async def edit_with_photo(
             await chat.send_message(
                 text=text, reply_markup=reply_markup, parse_mode=parse_mode
             )
+            return
+        except TelegramBadRequest:
+            pass
+        try:
+            await chat.send_message(
+                text=text, reply_markup=reply_markup
+            )
         except Exception:
             pass
         return
@@ -155,6 +177,13 @@ async def edit_with_photo(
                 await chat.send_message(
                     text=text, reply_markup=reply_markup, parse_mode=parse_mode
                 )
+            except TelegramBadRequest:
+                try:
+                    await chat.send_message(
+                        text=text, reply_markup=reply_markup
+                    )
+                except Exception:
+                    pass
             except Exception:
                 pass
             return
@@ -169,6 +198,13 @@ async def edit_with_photo(
         await chat.send_message(
             text=text, reply_markup=reply_markup, parse_mode=parse_mode
         )
+    except TelegramBadRequest:
+        try:
+            await chat.send_message(
+                text=text, reply_markup=reply_markup
+            )
+        except Exception:
+            pass
     except Exception:
         pass
 
