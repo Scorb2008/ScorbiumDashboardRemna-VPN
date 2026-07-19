@@ -19,12 +19,11 @@ def btn(
         kwargs["web_app"] = WebAppInfo(url=web_app)
     if style in ("danger", "success", "primary"):
         kwargs["style"] = style
-    if emoji_id:
+    if emoji_id and emoji_id.isdigit():
         kwargs["icon_custom_emoji_id"] = emoji_id
     try:
         return InlineKeyboardButton(**kwargs)
     except Exception:
-        extra_keys = ("style", "icon_custom_emoji_id")
-        for k in extra_keys:
+        for k in ("style", "icon_custom_emoji_id"):
             kwargs.pop(k, None)
         return InlineKeyboardButton(**kwargs)
