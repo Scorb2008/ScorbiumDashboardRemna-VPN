@@ -9,6 +9,7 @@
   let stats = $state(null);
   let loading = $state(true);
   let exporting = $state(false);
+  let exportingCsv = $state(false);
   let confirmClear = $state(false);
   let cleared = $state(false);
 
@@ -45,6 +46,22 @@
       await loadStats();
     } catch (e) { toasts.error('Ошибка: ' + e.message); }
     confirmClear = false;
+  }
+
+  async function handleCsvExport(type) {
+    exportingCsv = true;
+    try {
+      const res = type === 'users' ? await api.exportUsersCsv() : await api.exportPaymentsCsv();
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${type}_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toasts.success(`CSV ${type === 'users' ? 'пользователей' : 'платежей'} скачан`);
+    } catch (e) { toasts.error('Ошибка экспорта CSV: ' + e.message); }
+    finally { exportingCsv = false; }
   }
 </script>
 
@@ -96,7 +113,7 @@
       </div>
     </div>
 
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
       <div class="card p-5 space-y-4">
         <h3 class="text-[15px] font-semibold">Резервное копирование</h3>
         <p class="text-[13px] text-muted">Экспорт базы данных в SQL или gzip формат</p>
@@ -108,6 +125,21 @@
           <button class="btn btn-secondary flex-1" onclick={() => handleExport('gz')} disabled={exporting}>
             <Icon name="archive" class="w-4 h-4" />
             {exporting ? 'Экспорт...' : 'SQL + GZip'}
+          </button>
+        </div>
+      </div>
+
+      <div class="card p-5 space-y-4">
+        <h3 class="text-[15px] font-semibold">Экспорт CSV</h3>
+        <p class="text-[13px] text-muted">Данные пользователей и платежей</p>
+        <div class="flex gap-3">
+          <button class="btn btn-secondary flex-1" onclick={() => handleCsvExport('users')} disabled={exportingCsv}>
+            <Icon name="users" class="w-4 h-4" />
+            {exportingCsv ? '...' : 'Пользователи'}
+          </button>
+          <button class="btn btn-secondary flex-1" onclick={() => handleCsvExport('payments')} disabled={exportingCsv}>
+            <Icon name="wallet" class="w-4 h-4" />
+            {exportingCsv ? '...' : 'Платежи'}
           </button>
         </div>
       </div>
