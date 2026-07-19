@@ -377,11 +377,34 @@ class RemnawaveService(VpnPanelInterface):
     async def get_groups(self) -> list[dict]:
         try:
             data = await self._client.get("/api/internal-squads")
+            raw: list[dict] = []
             if isinstance(data, list):
-                return data
-            if isinstance(data, dict):
-                return data.get("squads", []) or data.get("groups", []) or data.get("response", []) or []
-            return []
+                raw = data
+            elif isinstance(data, dict):
+                raw = (
+                    data.get("internal_squads", [])
+                    or data.get("squads", [])
+                    or data.get("groups", [])
+                    or []
+                )
+            normalized = []
+            for g in raw:
+                info = g.get("info") if isinstance(g.get("info"), dict) else {}
+                inbounds = g.get("inbounds") or g.get("inbound_tags") or []
+                inbound_tags = [
+                    t.get("tag") or t.get("name") or str(t)
+                    if isinstance(t, dict)
+                    else str(t)
+                    for t in inbounds
+                ]
+                normalized.append({
+                    "uuid": str(g.get("uuid", g.get("id", ""))),
+                    "name": g.get("name", ""),
+                    "inbound_tags": inbound_tags,
+                    "total_users": info.get("members_count", 0),
+                    "is_disabled": g.get("is_disabled", False),
+                })
+            return normalized
         except RemnawaveRequestError as e:
             log.warning(f"[get_groups] failed: {e}")
             return []
