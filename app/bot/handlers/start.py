@@ -1,3 +1,4 @@
+import logging
 import secrets
 from decimal import Decimal
 from aiogram import Router, F
@@ -137,6 +138,9 @@ async def cmd_start(message: Message) -> None:
                 is_admin=_is_admin(message.from_user.id),
             )
         except Exception:
+            logging.getLogger(__name__).warning(
+                "Failed to build menu keyboard for user %s", message.from_user.id, exc_info=True
+            )
             kb = None
         photo = settings.get("photo_welcome")
 
@@ -163,7 +167,7 @@ async def cmd_start(message: Message) -> None:
         await answer_with_photo(message, welcome, reply_markup=kb, photo=photo or None)
     except Exception:
         try:
-            await message.answer(welcome, parse_mode="HTML")
+            await message.answer(welcome, parse_mode="HTML", reply_markup=kb)
         except Exception:
             pass
 

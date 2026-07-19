@@ -21,4 +21,10 @@ def btn(
         kwargs["style"] = style
     if emoji_id:
         kwargs["icon_custom_emoji_id"] = emoji_id
-    return InlineKeyboardButton(**kwargs)
+    try:
+        return InlineKeyboardButton(**kwargs)
+    except Exception:
+        extra_keys = ("style", "icon_custom_emoji_id")
+        for k in extra_keys:
+            kwargs.pop(k, None)
+        return InlineKeyboardButton(**kwargs)
