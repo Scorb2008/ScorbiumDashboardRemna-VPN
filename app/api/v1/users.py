@@ -64,23 +64,32 @@ async def give_key(
     db: AsyncSession = Depends(get_db),
     _: str = Depends(get_current_admin),
 ) -> dict:
-    from datetime import datetime, timedelta, timezone
-    from app.models.vpn_key import VpnKey, VpnKeyStatus
-
     user = await UserService(db).get_by_id(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
     plan_id = body.plan_id if body.plan_id else None
-    key = VpnKey(
-        user_id=user_id,
-        plan_id=plan_id,
-        status=VpnKeyStatus.ACTIVE.value,
-        expires_at=datetime.now(timezone.utc) + timedelta(days=body.days),
-    )
-    db.add(key)
+    if plan_id:
+        from app.services.plan import PlanService
+        plan = await PlanService(db).get_by_id(plan_id)
+        if not plan:
+            raise HTTPException(status_code=404, detail="Plan not found")
+        key = await VpnKeyService(db).provision(user_id, plan)
+    else:
+        from datetime import datetime, timedelta, timezone
+        from app.models.vpn_key import VpnKey, VpnKeyStatus
+        key = VpnKey(
+            user_id=user_id,
+            status=VpnKeyStatus.ACTIVE.value,
+            expires_at=datetime.now(timezone.utc) + timedelta(days=body.days),
+        )
+        db.add(key)
+        await db.flush()
+
+    if not key:
+        raise HTTPException(status_code=500, detail="Failed to provision VPN key")
+
     await db.commit()
-    await db.refresh(key)
     return {"ok": True, "key_id": key.id, "user_id": user_id}
 
 

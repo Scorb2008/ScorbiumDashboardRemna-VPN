@@ -71,6 +71,23 @@ async def _get_lang_from_session(user_id: int, session) -> str:
     return get_lang(settings, user_lang)
 
 
+@router.message(Command("cancel"))
+async def cmd_cancel(message: Message, state: FSMContext) -> None:
+    current = await state.get_state()
+    if current is None:
+        return
+    await state.clear()
+    async with AsyncSessionFactory() as session:
+        lang = await _get_lang_from_session(message.from_user.id, session)
+        kb = await _get_menu_kb(
+            session,
+            lang=lang,
+            user_id=message.from_user.id,
+            is_admin=_is_admin(message.from_user.id),
+        )
+    await message.answer(t("main_menu", lang), reply_markup=kb, parse_mode="HTML")
+
+
 @router.message(CommandStart())
 async def cmd_start(message: Message) -> None:
     args = message.text.split(maxsplit=1)
@@ -144,13 +161,15 @@ async def cmd_start(message: Message) -> None:
             )
         photo = settings.get("photo_welcome")
 
+    safe_name = escape_html(message.from_user.first_name or "")
+
     if welcome_tpl:
         try:
-            welcome = welcome_tpl.format(name=message.from_user.first_name)
+            welcome = welcome_tpl.format(name=safe_name)
         except Exception:
             welcome = None
         if not created and not welcome:
-            welcome = t("welcome_back", lang, name=message.from_user.first_name)
+            welcome = t("welcome_back", lang, name=safe_name)
     else:
         welcome = None
 
@@ -158,7 +177,7 @@ async def cmd_start(message: Message) -> None:
         welcome = t(
             "welcome" if created else "welcome_back",
             lang,
-            name=message.from_user.first_name,
+            name=safe_name,
         )
 
     from app.bot.utils.media import answer_with_photo
@@ -182,6 +201,8 @@ async def cmd_start(message: Message) -> None:
 
 @router.message(Command("debug_kb"))
 async def cmd_debug_kb(message: Message) -> None:
+    if not _is_admin(message.from_user.id):
+        return
     from html import escape as _esc
 
     lines = ["<b>DEBUG Keyboard State</b>", ""]
@@ -433,7 +454,7 @@ async def topup_got_amount(message: Message, state: FSMContext) -> None:
 
     raw_text = _message_text_or_none(message)
     if raw_text is None:
-        await message.answer(t("topup_invalid_amount", lang))
+        await message.answer(t("topup_invalid_amount", lang), reply_markup=back_kb(lang))
         return
 
     try:
@@ -441,7 +462,7 @@ async def topup_got_amount(message: Message, state: FSMContext) -> None:
         if amount < 50 or amount > 100000:
             raise ValueError
     except (ValueError, Exception):
-        await message.answer(t("topup_invalid_amount", lang))
+        await message.answer(t("topup_invalid_amount", lang), reply_markup=back_kb(lang))
         return
 
     await state.clear()

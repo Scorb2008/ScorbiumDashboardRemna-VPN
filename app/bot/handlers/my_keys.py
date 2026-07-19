@@ -1393,6 +1393,10 @@ async def extend_pay(callback: CallbackQuery) -> None:
             await _safe_cb_answer(callback, "Ошибка доступа", show_alert=True)
             return
 
+        if key.status == "revoked":
+            await _safe_cb_answer(callback, "Ключ отозван", show_alert=True)
+            return
+
         balance = float(user.balance or 0)
         price = float(plan.price or 0)
 
