@@ -130,6 +130,7 @@ async def cmd_start(message: Message) -> None:
         welcome_tpl = settings.get("welcome_message")
         user_lang = user.language if user and user.language else None
         lang = get_lang(settings, user_lang)
+        kb = None
         try:
             kb = await _get_menu_kb(
                 session,
@@ -138,10 +139,9 @@ async def cmd_start(message: Message) -> None:
                 is_admin=_is_admin(message.from_user.id),
             )
         except Exception:
-            logging.getLogger(__name__).warning(
-                "Failed to build menu keyboard for user %s", message.from_user.id, exc_info=True
+            logging.getLogger(__name__).error(
+                "Keyboard build failed for user %s", message.from_user.id, exc_info=True
             )
-            kb = None
         photo = settings.get("photo_welcome")
 
     if welcome_tpl:
@@ -166,10 +166,83 @@ async def cmd_start(message: Message) -> None:
     try:
         await answer_with_photo(message, welcome, reply_markup=kb, photo=photo or None)
     except Exception:
+        logging.getLogger(__name__).error(
+            "answer_with_photo failed for user %s", message.from_user.id, exc_info=True
+        )
         try:
             await message.answer(welcome, parse_mode="HTML", reply_markup=kb)
         except Exception:
-            pass
+            logging.getLogger(__name__).error(
+                "fallback answer also failed for user %s", message.from_user.id, exc_info=True
+            )
+
+
+@router.message(Command("debug_kb"))
+async def cmd_debug_kb(message: Message) -> None:
+    lines = ["<b>DEBUG Keyboard State</b>", ""]
+
+    async with AsyncSessionFactory() as session:
+        svc = BotSettingsService(session)
+        s = await svc.get_all()
+        is_admin = _is_admin(message.from_user.id)
+
+        raw_layout = s.get("keyboard_layout", "")
+        raw_btn_order = s.get("btn_order", "")
+        lines.append(f"<b>keyboard_layout:</b> <code>{raw_layout[:200] or '(empty)'}</code>")
+        lines.append(f"<b>btn_order:</b> <code>{raw_btn_order[:200] or '(empty)'}</code>")
+        lines.append("")
+
+        btn_keys = {}
+        from app.bot.utils.menu import _BUTTON_IDS
+        for bid in _BUTTON_IDS:
+            label = s.get(f"btn_{bid}", "")
+            style = s.get(f"btn_{bid}_style", "")
+            if not style:
+                style = s.get(f"btn_style_{bid}", "")
+            icon = s.get(f"btn_icon_{bid}", "")
+            if label or style or icon:
+                btn_keys[bid] = {"label": label, "style": style, "icon": icon}
+
+        if btn_keys:
+            lines.append("<b>Custom button settings (DB):</b>")
+            for bid, v in btn_keys.items():
+                parts = []
+                if v["label"]: parts.append(f'text="{v["label"]}"')
+                if v["style"]: parts.append(f'style={v["style"]}')
+                if v["icon"]: parts.append(f'icon={v["icon"]}')
+                lines.append(f"  <code>{bid}</code>: {' '.join(parts)}")
+        else:
+            lines.append("<b>Custom button settings:</b> none")
+        lines.append("")
+
+        try:
+            from app.bot.utils.menu import get_main_menu_kb
+            kb = await get_main_menu_kb(
+                session,
+                lang="ru",
+                user_id=message.from_user.id,
+                is_admin=is_admin,
+            )
+            lines.append(f"<b>Keyboard result:</b> {len(kb.inline_keyboard)} rows")
+            for i, row in enumerate(kb.inline_keyboard):
+                btns = []
+                for b in row:
+                    if b.url:
+                        btns.append(f'"{b.text}" → url')
+                    elif b.web_app:
+                        btns.append(f'"{b.text}" → webapp')
+                    elif b.callback_data:
+                        btns.append(f'"{b.text}" → {b.callback_data}')
+                    else:
+                        btns.append(f'"{b.text}" → ?')
+                lines.append(f"  Row {i+1}: {' | '.join(btns)}")
+        except Exception as e:
+            lines.append(f"<b>Keyboard build ERROR:</b> <code>{type(e).__name__}: {e}</code>")
+            import traceback
+            tb = traceback.format_exc()
+            lines.append(f"<pre>{tb[-800:]}</pre>")
+
+    await message.answer("\n".join(lines), parse_mode="HTML")
 
 
 @router.callback_query(F.data == "channel:check")
