@@ -229,19 +229,6 @@ async def get_main_menu_kb(
     if not layout:
         layout = _DEFAULT_LAYOUT
 
-    # Append enabled buttons not yet in layout
-    if layout is not None:
-        default_map = {}
-        for row in _DEFAULT_LAYOUT:
-            for b in row:
-                default_map[b["id"]] = b
-        layout_ids = {b.get("id") for row in layout for b in row if isinstance(b, dict)}
-        for bid in _BUTTON_IDS:
-            if bid in layout_ids:
-                continue
-            if s.get(f"btn_{bid}", "").strip() and bid in default_map:
-                layout.append([default_map[bid]])
-
     if user_id and s.get("trial_enabled", "0") == "1":
         from sqlalchemy import select
         from app.models.vpn_key import VpnKey
