@@ -179,6 +179,8 @@ async def cmd_start(message: Message) -> None:
 
 @router.message(Command("debug_kb"))
 async def cmd_debug_kb(message: Message) -> None:
+    from html import escape as _esc
+
     lines = ["<b>DEBUG Keyboard State</b>", ""]
 
     async with AsyncSessionFactory() as session:
@@ -188,8 +190,8 @@ async def cmd_debug_kb(message: Message) -> None:
 
         raw_layout = s.get("keyboard_layout", "")
         raw_btn_order = s.get("btn_order", "")
-        lines.append(f"<b>keyboard_layout:</b> <code>{raw_layout[:200] or '(empty)'}</code>")
-        lines.append(f"<b>btn_order:</b> <code>{raw_btn_order[:200] or '(empty)'}</code>")
+        lines.append(f"<b>keyboard_layout:</b> <code>{_esc(raw_layout[:200] or '(empty)')}</code>")
+        lines.append(f"<b>btn_order:</b> <code>{_esc(raw_btn_order[:200] or '(empty)')}</code>")
         lines.append("")
 
         btn_keys = {}
@@ -207,9 +209,9 @@ async def cmd_debug_kb(message: Message) -> None:
             lines.append("<b>Custom button settings (DB):</b>")
             for bid, v in btn_keys.items():
                 parts = []
-                if v["label"]: parts.append(f'text="{v["label"]}"')
-                if v["style"]: parts.append(f'style={v["style"]}')
-                if v["icon"]: parts.append(f'icon={v["icon"]}')
+                if v["label"]: parts.append(f'text="{_esc(v["label"])}"')
+                if v["style"]: parts.append(f'style={_esc(v["style"])}')
+                if v["icon"]: parts.append(f'icon={_esc(v["icon"])}')
                 lines.append(f"  <code>{bid}</code>: {' '.join(parts)}")
         else:
             lines.append("<b>Custom button settings:</b> none")
@@ -228,19 +230,20 @@ async def cmd_debug_kb(message: Message) -> None:
                 btns = []
                 for b in row:
                     if b.url:
-                        btns.append(f'"{b.text}" → url')
+                        btns.append(f'"{_esc(b.text)}" → url')
                     elif b.web_app:
-                        btns.append(f'"{b.text}" → webapp')
+                        btns.append(f'"{_esc(b.text)}" → webapp')
                     elif b.callback_data:
-                        btns.append(f'"{b.text}" → {b.callback_data}')
+                        btns.append(f'"{_esc(b.text)}" → {_esc(b.callback_data)}')
                     else:
-                        btns.append(f'"{b.text}" → ?')
+                        btns.append(f'"{_esc(b.text)}" → ?')
                 lines.append(f"  Row {i+1}: {' | '.join(btns)}")
         except Exception as e:
-            lines.append(f"<b>Keyboard build ERROR:</b> <code>{type(e).__name__}: {e}</code>")
+            from html import escape as _esc
+            lines.append(f"<b>Keyboard build ERROR:</b> <code>{type(e).__name__}: {_esc(str(e))}</code>")
             import traceback
             tb = traceback.format_exc()
-            lines.append(f"<pre>{tb[-800:]}</pre>")
+            lines.append(f"<pre>{_esc(tb[-800:])}</pre>")
 
     await message.answer("\n".join(lines), parse_mode="HTML")
 
