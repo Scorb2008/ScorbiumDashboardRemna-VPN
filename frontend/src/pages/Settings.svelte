@@ -17,6 +17,7 @@
   const TABS = [
     { id: 'payments', label: 'Платежи', icon: 'wallet' },
     { id: 'system', label: 'Система', icon: 'terminal' },
+    { id: 'notifications', label: 'Уведомления', icon: 'bell' },
     { id: 'monitoring', label: 'Мониторинг', icon: 'activity' },
     { id: 'trial', label: 'Пробный период', icon: 'zap' },
   ];
@@ -397,6 +398,175 @@
             {/if}
             Сохранить все
           </button>
+        </div>
+
+      {:else if activeTab === 'notifications'}
+        <div class="space-y-4">
+          <div>
+            <h2 class="text-[17px] font-semibold flex items-center gap-2">
+              <Icon name="bell" class="w-5 h-5 text-accent" /> Управление уведомлениями
+            </h2>
+            <p class="text-[13px] text-muted mt-0.5">Настройка оповещений о сервисах и подписках</p>
+          </div>
+
+          <!-- Master toggle -->
+          <div class="card p-5">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="text-[14px] font-semibold">Системные оповещения</h3>
+                <p class="text-[12px] text-muted mt-0.5">Уведомления о статусе сервисов (БД, Telegram, VPN панель, платёжки)</p>
+              </div>
+              <button
+                onclick={() => { botSettings['notify_monitoring_enabled'] = botSettings['notify_monitoring_enabled'] === '1' ? '0' : '1'; }}
+                class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border border-[#2a2a35] transition-colors duration-200
+                  {botSettings['notify_monitoring_enabled'] === '1' ? 'bg-accent border-accent' : 'bg-[#1c1c24]'}"
+              >
+                <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200
+                  {botSettings['notify_monitoring_enabled'] === '1' ? 'translate-x-[22px]' : 'translate-x-0.5'}" />
+              </button>
+            </div>
+          </div>
+
+          {#if botSettings['notify_monitoring_enabled'] === '1'}
+            <!-- Per-service toggles -->
+            <div class="card p-5 space-y-3">
+              <h3 class="text-[14px] font-semibold">Оповещения по сервисам</h3>
+              <p class="text-[12px] text-muted">Выберите о каких сервисах присылать уведомления</p>
+              {#each [
+                { key: 'notify_svc_database', label: 'База данных', icon: 'database' },
+                { key: 'notify_svc_telegram_bot', label: 'Telegram бот', icon: 'bot' },
+                { key: 'notify_svc_vpn_panel', label: 'VPN панель (Remnawave)', icon: 'shield' },
+                { key: 'notify_svc_yookassa', label: 'ЮKassa', icon: 'creditCard' },
+                { key: 'notify_svc_cryptobot', label: 'CryptoBot', icon: 'wallet' },
+                { key: 'notify_svc_freekassa', label: 'FreeKassa', icon: 'dollarSign' },
+              ] as svc}
+                <div class="flex items-center justify-between py-2 px-3 rounded-lg bg-surface-3/30 border border-surface-4/10">
+                  <div class="flex items-center gap-2.5">
+                    <Icon name={svc.icon} class="w-4 h-4 text-muted" />
+                    <span class="text-[13px]">{svc.label}</span>
+                  </div>
+                  <button
+                    onclick={() => { botSettings[svc.key] = botSettings[svc.key] === '1' ? '0' : '1'; }}
+                    class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border border-[#2a2a35] transition-colors duration-200
+                      {botSettings[svc.key] === '1' ? 'bg-accent border-accent' : 'bg-[#1c1c24]'}"
+                  >
+                    <span class="inline-block h-3 w-3 transform rounded-full bg-white transition-transform duration-200
+                      {botSettings[svc.key] === '1' ? 'translate-x-[18px]' : 'translate-x-0.5'}" />
+                  </button>
+                </div>
+              {/each}
+            </div>
+
+            <!-- Alert settings -->
+            <div class="card p-5 space-y-4">
+              <h3 class="text-[14px] font-semibold">Параметры оповещений</h3>
+              <div class="space-y-3">
+                <div class="space-y-1">
+                  <label class="label"><span class="label-text text-[13px]">Интервал повторных оповещений (сек)</span></label>
+                  <input
+                    type="number"
+                    value={botSettings['notify_cooldown_seconds'] ?? '300'}
+                    oninput={(e) => botSettings['notify_cooldown_seconds'] = e.target.value}
+                    class="input w-full text-[13px]"
+                    min="60"
+                    placeholder="300"
+                  />
+                  <p class="text-[11px] text-muted">Минимум 60 сек. Повторное оповещение о том же сервисе придет только через это время.</p>
+                </div>
+
+                <div class="flex items-center justify-between py-2 px-3 rounded-lg bg-surface-3/30 border border-surface-4/10">
+                  <div>
+                    <span class="text-[13px]">Оповещать о деградации</span>
+                    <p class="text-[11px] text-muted">Когда сервис работает медленно, но не упал</p>
+                  </div>
+                  <button
+                    onclick={() => { botSettings['notify_on_degraded'] = botSettings['notify_on_degraded'] === '1' ? '0' : '1'; }}
+                    class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border border-[#2a2a35] transition-colors duration-200
+                      {botSettings['notify_on_degraded'] === '1' ? 'bg-accent border-accent' : 'bg-[#1c1c24]'}"
+                  >
+                    <span class="inline-block h-3 w-3 transform rounded-full bg-white transition-transform duration-200
+                      {botSettings['notify_on_degraded'] === '1' ? 'translate-x-[18px]' : 'translate-x-0.5'}" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Subscription expiry alerts -->
+            <div class="card p-5 space-y-3">
+              <div class="flex items-center justify-between">
+                <div>
+                  <h3 class="text-[14px] font-semibold">Уведомления об истечении подписок</h3>
+                  <p class="text-[12px] text-muted">Оповещать пользователей перед окончанием подписки</p>
+                </div>
+                <button
+                  onclick={() => { botSettings['notify_expiry_enabled'] = botSettings['notify_expiry_enabled'] === '1' ? '0' : '1'; }}
+                  class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border border-[#2a2a35] transition-colors duration-200
+                    {botSettings['notify_expiry_enabled'] === '1' ? 'bg-accent border-accent' : 'bg-[#1c1c24]'}"
+                >
+                  <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200
+                    {botSettings['notify_expiry_enabled'] === '1' ? 'translate-x-[22px]' : 'translate-x-0.5'}" />
+                </button>
+              </div>
+              {#if botSettings['notify_expiry_enabled'] === '1'}
+                <div class="space-y-2 pl-1">
+                  <div class="space-y-1">
+                    <label class="label"><span class="label-text text-[13px]">Дни до истечения</span></label>
+                    <input
+                      type="text"
+                      value={botSettings['notify_expiry_days'] ?? '7,3,1'}
+                      oninput={(e) => botSettings['notify_expiry_days'] = e.target.value}
+                      class="input w-full text-[13px]"
+                      placeholder="7,3,1"
+                    />
+                    <p class="text-[11px] text-muted">Через запятую. Уведомления придут за указанное количество дней до истечения.</p>
+                  </div>
+                  <div class="space-y-1">
+                    <label class="label"><span class="label-text text-[13px]">Текст уведомления</span></label>
+                    <textarea
+                      value={botSettings['notify_expiry_message'] ?? ''}
+                      oninput={(e) => botSettings['notify_expiry_message'] = e.target.value}
+                      class="textarea w-full text-[13px]"
+                      rows="4"
+                      placeholder="Текст уведомления..."
+                    ></textarea>
+                    <p class="text-[11px] text-muted">Переменные: {'{days}'}, {'{name}'}, {'{date}'}</p>
+                  </div>
+                </div>
+              {/if}
+            </div>
+
+            <!-- Chat IDs -->
+            <div class="card p-5 space-y-3">
+              <h3 class="text-[14px] font-semibold">Получатели оповещений</h3>
+              <div class="space-y-1">
+                <label class="label"><span class="label-text text-[13px]">Chat ID (через запятую)</span></label>
+                <input
+                  type="text"
+                  value={botSettings['notify_chat_ids'] ?? ''}
+                  oninput={(e) => botSettings['notify_chat_ids'] = e.target.value}
+                  class="input w-full text-[13px]"
+                  placeholder="Оставьте пустым для использования admin IDs из .env"
+                />
+                <p class="text-[11px] text-muted">ID чатов куда слать уведомления. Если пусто — используется TELEGRAM_ADMIN_IDS из .env</p>
+              </div>
+            </div>
+
+            <button
+              onclick={() => saveSettingsSection([
+                'notify_monitoring_enabled', 'notify_svc_database', 'notify_svc_telegram_bot',
+                'notify_svc_vpn_panel', 'notify_svc_yookassa', 'notify_svc_cryptobot', 'notify_svc_freekassa',
+                'notify_cooldown_seconds', 'notify_on_degraded', 'notify_expiry_enabled',
+                'notify_expiry_days', 'notify_expiry_message', 'notify_chat_ids',
+              ])}
+              disabled={saving._section}
+              class="btn btn-primary btn-sm"
+            >
+              {#if saving._section}
+                <div class="w-4 h-4 border-2 border-surface-4 border-t-white rounded-full animate-spin"></div>
+              {/if}
+              Сохранить все
+            </button>
+          {/if}
         </div>
 
       {:else if activeTab === 'trial'}

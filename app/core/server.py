@@ -717,16 +717,6 @@ def _start_monitoring():
                 metrics = await SystemMetrics.collect()
                 await alert_manager.check_metrics_and_alert(metrics)
 
-                from app.core.database import AsyncSessionFactory
-                from sqlalchemy import text
-
-                try:
-                    async with AsyncSessionFactory() as session:
-                        await session.execute(text("SELECT 1"))
-                    await alert_manager.check_service_health("Database", True)
-                except Exception:
-                    await alert_manager.check_service_health("Database", False)
-
             except Exception as e:
                 log.error("Monitor loop error: %s", e)
 

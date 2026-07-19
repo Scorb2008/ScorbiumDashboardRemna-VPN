@@ -14,8 +14,20 @@ class ServiceAlertManager:
         self._last_alerts: Dict[str, float] = {}
         self._cooldown = 1800
 
+    async def _is_enabled(self) -> bool:
+        try:
+            from app.core.database import AsyncSessionFactory
+            from app.services.bot_settings import BotSettingsService
+            async with AsyncSessionFactory() as session:
+                svc = BotSettingsService(session)
+                return (await svc.get("notify_monitoring_enabled")) == "1"
+        except Exception:
+            return True
+
     async def check_metrics_and_alert(self, metrics: dict) -> None:
         """Check metrics and send alerts if thresholds exceeded."""
+        if not await self._is_enabled():
+            return
         now = datetime.now(timezone.utc).timestamp()
 
         if metrics["cpu"] > 90:
@@ -37,6 +49,8 @@ class ServiceAlertManager:
 
     async def check_service_health(self, service_name: str, is_healthy: bool) -> None:
         """Alert on service status change."""
+        if not await self._is_enabled():
+            return
         now = datetime.now(timezone.utc).timestamp()
 
         if not is_healthy:

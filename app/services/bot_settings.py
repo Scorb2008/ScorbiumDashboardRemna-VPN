@@ -105,6 +105,7 @@ DEFAULTS = {
     "notify_svc_vpn_panel": "1",
     "notify_svc_yookassa": "0",
     "notify_svc_cryptobot": "0",
+    "notify_svc_freekassa": "0",
     "notify_cooldown_seconds": "300",
     "notify_on_degraded": "0",
     # ── Telegram Chat ID для уведомлений ──────────────────────────────────────
