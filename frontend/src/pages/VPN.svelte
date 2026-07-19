@@ -25,6 +25,8 @@
 
   let confirmDelete = $state(false);
   let deleteTarget = $state(null);
+  let confirmDeactivate = $state(false);
+  let deactivateTarget = $state(null);
 
   async function loadSubscriptions() {
     loading = true;
@@ -108,12 +110,20 @@
     } catch (e) { toasts.error(e.message); }
   }
 
-  async function handleDeactivate(id) {
+  function askDeactivate(sub) {
+    deactivateTarget = sub;
+    confirmDeactivate = true;
+  }
+
+  async function handleDeactivate() {
+    if (!deactivateTarget) return;
     try {
-      await api.deactivateSubscription(id);
+      await api.deactivateSubscription(deactivateTarget.id);
       toasts.success('Подписка деактивирована');
       await loadSubscriptions();
     } catch (e) { toasts.error(e.message); }
+    confirmDeactivate = false;
+    deactivateTarget = null;
   }
 
   function askDelete(sub) {
@@ -181,7 +191,7 @@
         <button class="btn btn-ghost text-success hover:text-success-hover" onclick={() => handleActivate(row.id)} title="Активировать"><Icon name="play" class="w-3.5 h-3.5" /></button>
       {/if}
       {#if row.status === 'active'}
-        <button class="btn btn-ghost text-warning hover:text-warning-hover" onclick={() => handleDeactivate(row.id)} title="Деактивировать"><Icon name="pause" class="w-3.5 h-3.5" /></button>
+        <button class="btn btn-ghost text-warning hover:text-warning-hover" onclick={() => askDeactivate(row)} title="Деактивировать"><Icon name="pause" class="w-3.5 h-3.5" /></button>
       {/if}
       <button class="btn btn-ghost text-danger hover:text-danger-hover" onclick={() => askDelete(row)} title="Удалить"><Icon name="trash-2" class="w-3.5 h-3.5" /></button>
     {/snippet}
@@ -235,4 +245,14 @@
   danger
   onConfirm={doDelete}
   onCancel={() => { confirmDelete = false; deleteTarget = null; }}
+/>
+
+<ConfirmDialog
+  bind:show={confirmDeactivate}
+  title="Деактивировать подписку?"
+  message={`Деактивировать подписку #${deactivateTarget?.id}? Пользователь потеряет доступ к VPN.`}
+  confirmText="Деактивировать"
+  danger
+  onConfirm={handleDeactivate}
+  onCancel={() => { confirmDeactivate = false; deactivateTarget = null; }}
 />

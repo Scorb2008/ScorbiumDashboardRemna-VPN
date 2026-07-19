@@ -153,6 +153,27 @@
     } catch (e) { toasts.error(e.message); }
     finally { saving._section = false; }
   }
+
+  async function toggleAndSave(key) {
+    const newVal = botSettings[key] === '1' ? '0' : '1';
+    botSettings[key] = newVal;
+    saving[key] = true;
+    try {
+      await api.updateSettings({ [key]: newVal });
+    } catch (e) {
+      botSettings[key] = newVal === '1' ? '0' : '1';
+      toasts.error(e.message);
+    } finally { saving[key] = false; }
+  }
+
+  async function saveSingleSetting(key) {
+    saving[key] = true;
+    try {
+      await api.updateSettings({ [key]: botSettings[key] });
+      toasts.success('Сохранено');
+    } catch (e) { toasts.error(e.message); }
+    finally { saving[key] = false; }
+  }
 </script>
 
 <Spinner {loading} />
@@ -361,7 +382,7 @@
                   <label class="label"><span class="label-text text-[13px]">{field.label}</span></label>
                   {#if field.type === 'checkbox'}
                     <button
-                      onclick={() => botSettings[field.key] = !botSettings[field.key]}
+                      onclick={() => toggleAndSave(field.key)}
                       class="mt-1 relative inline-flex h-6 w-10 shrink-0 cursor-pointer items-center rounded-full border border-[#2a2a35] transition-colors duration-200 ease-in-out
                         {botSettings[field.key] ? 'bg-accent border-accent' : 'bg-[#1c1c24]'}"
                     >
@@ -417,7 +438,7 @@
                 <p class="text-[12px] text-muted mt-0.5">Уведомления о статусе сервисов (БД, Telegram, VPN панель, платёжки)</p>
               </div>
               <button
-                onclick={() => { botSettings['notify_monitoring_enabled'] = botSettings['notify_monitoring_enabled'] === '1' ? '0' : '1'; }}
+                onclick={() => toggleAndSave('notify_monitoring_enabled')}
                 class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border border-[#2a2a35] transition-colors duration-200
                   {botSettings['notify_monitoring_enabled'] === '1' ? 'bg-accent border-accent' : 'bg-[#1c1c24]'}"
               >
@@ -446,7 +467,7 @@
                     <span class="text-[13px]">{svc.label}</span>
                   </div>
                   <button
-                    onclick={() => { botSettings[svc.key] = botSettings[svc.key] === '1' ? '0' : '1'; }}
+                    onclick={() => toggleAndSave(svc.key)}
                     class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border border-[#2a2a35] transition-colors duration-200
                       {botSettings[svc.key] === '1' ? 'bg-accent border-accent' : 'bg-[#1c1c24]'}"
                   >
@@ -480,7 +501,7 @@
                     <p class="text-[11px] text-muted">Когда сервис работает медленно, но не упал</p>
                   </div>
                   <button
-                    onclick={() => { botSettings['notify_on_degraded'] = botSettings['notify_on_degraded'] === '1' ? '0' : '1'; }}
+                    onclick={() => toggleAndSave('notify_on_degraded')}
                     class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border border-[#2a2a35] transition-colors duration-200
                       {botSettings['notify_on_degraded'] === '1' ? 'bg-accent border-accent' : 'bg-[#1c1c24]'}"
                   >
@@ -499,7 +520,7 @@
                   <p class="text-[12px] text-muted">Оповещать пользователей перед окончанием подписки</p>
                 </div>
                 <button
-                  onclick={() => { botSettings['notify_expiry_enabled'] = botSettings['notify_expiry_enabled'] === '1' ? '0' : '1'; }}
+                  onclick={() => toggleAndSave('notify_expiry_enabled')}
                   class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border border-[#2a2a35] transition-colors duration-200
                     {botSettings['notify_expiry_enabled'] === '1' ? 'bg-accent border-accent' : 'bg-[#1c1c24]'}"
                 >
@@ -585,7 +606,7 @@
                   <label class="label"><span class="label-text text-[13px]">{field.label}</span></label>
                   {#if field.type === 'checkbox'}
                     <button
-                      onclick={() => botSettings[field.key] = !botSettings[field.key]}
+                      onclick={() => toggleAndSave(field.key)}
                       class="mt-1 relative inline-flex h-6 w-10 shrink-0 cursor-pointer items-center rounded-full border border-[#2a2a35] transition-colors duration-200 ease-in-out
                         {botSettings[field.key] ? 'bg-accent border-accent' : 'bg-[#1c1c24]'}"
                     >

@@ -7,6 +7,7 @@
   import Modal from '../components/Modal.svelte';
   import Spinner from '../components/Spinner.svelte';
   import Icon from '../components/Icon.svelte';
+  import ConfirmDialog from '../components/ConfirmDialog.svelte';
 
   let users = $state([]);
   let loading = $state(true);
@@ -119,8 +120,12 @@
     finally { detailLoading = false; }
   }
 
+  let confirmBan = $state(false);
+  let confirmBulkBan = $state(false);
+  let confirmBulkBalance = $state(false);
+
   async function loadKeys() {
-    if (userKeys.length > 0 || !selectedUser) return;
+    if (!selectedUser) return;
     keysLoading = true;
     try { userKeys = await api.getUserKeys(selectedUser.id); }
     catch (e) { toasts.error('Ошибка загрузки ключей'); }
@@ -128,7 +133,7 @@
   }
 
   async function loadPayments() {
-    if (userPayments.length > 0 || !selectedUser) return;
+    if (!selectedUser) return;
     paymentsLoading = true;
     try { userPayments = await api.getUserPayments(selectedUser.id); }
     catch (e) { toasts.error('Ошибка загрузки платежей'); }
@@ -148,8 +153,39 @@
       else { await api.banUser(selectedUser.id); toasts.success('Пользователь забанен'); }
       selectedUser.is_banned = !selectedUser.is_banned;
       userDetail.is_banned = selectedUser.is_banned;
+      confirmBan = false;
       await loadUsers();
     } catch (e) { toasts.error(e.message); }
+  }
+
+  async function handleBulkBalance() {
+    const ids = Array.from(selectedUsers);
+    if (ids.length === 0) return toasts.warning('Выберите пользователей');
+    const val = parseFloat(bulkBalanceValue);
+    if (isNaN(val)) return toasts.error('Введите число');
+    bulkSaving = true;
+    confirmBulkBalance = false;
+    try {
+      await api.bulkAction(ids, 'set_balance', bulkBalanceValue);
+      toasts.success(`Баланс установлен для ${ids.length} пользователей`);
+      clearSelection();
+      await loadUsers();
+    } catch (e) { toasts.error(e.message); }
+    finally { bulkSaving = false; }
+  }
+
+  async function handleBulkBan() {
+    const ids = Array.from(selectedUsers);
+    if (ids.length === 0) return;
+    bulkSaving = true;
+    confirmBulkBan = false;
+    try {
+      await api.bulkAction(ids, 'ban');
+      toasts.success(`Забанено ${ids.length} пользователей`);
+      clearSelection();
+      await loadUsers();
+    } catch (e) { toasts.error(e.message); }
+    finally { bulkSaving = false; }
   }
 
   async function saveBalance() {
@@ -224,6 +260,7 @@
     if (failed > 0) toasts.error(`Ошибка у ${failed} пользователей`);
     clearSelection();
     bulkSaving = false;
+    if (success > 0) await loadUsers();
   }
 
   function toggleMassActions() {
@@ -328,7 +365,7 @@
               class="input w-28"
             />
             <button
-              onclick={() => handleBulkAction('set_balance', bulkBalanceValue)}
+              onclick={() => confirmBulkBalance = true}
               disabled={bulkSaving || !bulkBalanceValue || selectedUsers.size === 0}
               class="btn btn-primary btn-sm whitespace-nowrap">
               <Icon name="wallet" size={14} />
@@ -339,7 +376,7 @@
           <div class="flex items-center gap-2 flex-wrap">
             <!-- Ban -->
             <button
-              onclick={() => handleBulkAction('ban')}
+              onclick={() => confirmBulkBan = true}
               disabled={bulkSaving || selectedUsers.size === 0}
               class="btn btn-danger btn-sm">
               <Icon name="userX" size={14} />
@@ -519,7 +556,7 @@
               <Icon name="wallet" class="w-3.5 h-3.5" /> Редактировать баланс
             </button>
           {/if}
-          <button onclick={handleBan} class="btn {userDetail.is_banned ? 'btn-primary' : 'btn-danger'} btn-sm flex-1">
+          <button onclick={() => userDetail.is_banned ? handleBan() : (confirmBan = true)} class="btn {userDetail.is_banned ? 'btn-primary' : 'btn-danger'} btn-sm flex-1">
             {userDetail.is_banned ? 'Разбанить' : 'Забанить'}
           </button>
         </div>
@@ -594,3 +631,9 @@
     {/if}
   {/if}
 </Modal>
+
+<ConfirmDialog bind:show={confirmBan} title="Забанить пользователя?" message="Пользователь потеряет доступ к боту и получит уведомление." confirmText="Забанить" onConfirm={handleBan} />
+
+<ConfirmDialog bind:show={confirmBulkBan} title="Забанить пользователей?" message="Выбранные пользователи потеряют доступ к боту." confirmText="Забанить" onConfirm={handleBulkBan} />
+
+<ConfirmDialog bind:show={confirmBulkBalance} title="Установить баланс?" message="Баланс будет установлен для всех выбранных пользователей." confirmText="Применить" danger={false} onConfirm={handleBulkBalance} />

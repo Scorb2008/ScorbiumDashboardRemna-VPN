@@ -59,12 +59,17 @@
         is_active: form.is_active,
       };
       if (form.discount_type === 'percent') {
-        payload.discount_percent = form.discount_value;
+        const val = parseFloat(form.discount_value) || 0;
+        if (val < 1 || val > 100) return toasts.error('Процент скидки должен быть от 1 до 100');
+        payload.discount_percent = val;
         payload.discount_amount = 0;
       } else {
-        payload.discount_amount = form.discount_value;
+        const val = parseFloat(form.discount_value) || 0;
+        if (val <= 0) return toasts.error('Сумма скидки должна быть больше 0');
+        payload.discount_amount = val;
         payload.discount_percent = 0;
       }
+      if (!form.code?.trim()) return toasts.error('Введите код промокода');
       if (editPromo) { await api.updatePromo(editPromo.id, payload); toasts.success('Промокод обновлён'); }
       else { await api.createPromo(payload); toasts.success('Промокод создан'); }
       showModal = false; await loadPromos();

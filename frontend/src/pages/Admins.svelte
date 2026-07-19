@@ -48,6 +48,10 @@
       toasts.error('Заполните все поля');
       return;
     }
+    if (createForm.password.length < 8) {
+      toasts.error('Пароль должен быть не менее 8 символов');
+      return;
+    }
     try {
       await api.createAdmin(createForm);
       toasts.success('Администратор создан');
@@ -64,6 +68,8 @@
 
   async function handleEdit() {
     if (!editTarget) return;
+    if (!editForm.username?.trim()) return toasts.error('Введите имя пользователя');
+    if (editForm.password && editForm.password.length < 8) return toasts.error('Пароль должен быть не менее 8 символов');
     try {
       const data = { username: editForm.username, role: editForm.role, is_active: editForm.is_active };
       if (editForm.password) data.password = editForm.password;

@@ -5,12 +5,16 @@
   import { formatDateTime } from '../lib/utils.js';
   import Spinner from '../components/Spinner.svelte';
   import Icon from '../components/Icon.svelte';
+  import ConfirmDialog from '../components/ConfirmDialog.svelte';
 
   let broadcastHistory = $state([]);
   let loading = $state(true);
   let text = $state('');
   let target = $state('all');
   let sending = $state(false);
+  let confirmSend = $state(false);
+
+  const TARGET_LABELS = { all: 'всем пользователям', active: 'активным (за 7 дней)', paid: 'платившим', expired: 'с истёкшим ключом' };
 
   async function loadHistory() {
     loading = true;
@@ -23,6 +27,11 @@
 
   async function sendBroadcast() {
     if (!text.trim()) return toasts.error('Введите текст рассылки');
+    confirmSend = true;
+  }
+
+  async function doSendBroadcast() {
+    confirmSend = false;
     sending = true;
     try {
       const created = await api.createBroadcast({ text: text.trim(), target });
@@ -95,3 +104,5 @@
     </div>
   {/if}
 </div>
+
+<ConfirmDialog bind:show={confirmSend} title="Отправить рассылку?" message={`Рассылка будет отправлена ${TARGET_LABELS[target] || target}.`} confirmText="Отправить" danger={false} onConfirm={doSendBroadcast} />

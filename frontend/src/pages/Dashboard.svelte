@@ -9,6 +9,7 @@
   let stats = $state(null);
   let loading = $state(true);
   let logoUrl = $state('');
+  let error = $state(null);
 
   onMount(async () => {
     try {
@@ -20,6 +21,7 @@
       logoUrl = settings?.logo_url || '';
     } catch (e) {
       console.error(e);
+      error = e.message || 'Ошибка загрузки';
     } finally {
       loading = false;
     }
@@ -73,9 +75,13 @@
             </div>
             <div class="flex-1">
               <p class="text-[11px] text-muted uppercase tracking-wider mb-1">Статус</p>
-              <span class="badge badge-success">Активен</span>
+              {#if stats.bot_username}
+                <span class="badge badge-success">Активен</span>
+              {:else}
+                <span class="badge badge-danger">Не подключён</span>
+              {/if}
             </div>
-            <button class="btn btn-secondary btn-sm">
+            <button class="btn btn-secondary btn-sm" onclick={() => stats.bot_username ? window.open(`https://t.me/${stats.bot_username}`, '_blank') : null} disabled={!stats.bot_username}>
               <Icon name="external-link" class="w-3.5 h-3.5" />
               Перейти
             </button>
@@ -162,8 +168,11 @@
   {:else if !loading}
     <div class="card p-12 flex flex-col items-center gap-3 text-center">
       <Icon name="bar-chart-3" class="w-12 h-12 text-muted" />
-      <p class="text-[17px] font-semibold">Нет данных</p>
-      <p class="text-[13px] text-muted">Статистика пока недоступна</p>
+      <p class="text-[17px] font-semibold">{error ? 'Ошибка загрузки' : 'Нет данных'}</p>
+      <p class="text-[13px] text-muted">{error || 'Статистика пока недоступна'}</p>
+      {#if error}
+        <button onclick={() => window.location.reload()} class="btn btn-primary btn-sm mt-2">Повторить</button>
+      {/if}
     </div>
   {/if}
 </div>

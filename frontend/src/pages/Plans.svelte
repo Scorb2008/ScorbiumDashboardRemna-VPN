@@ -39,6 +39,11 @@
   }
 
   async function savePlan() {
+    if (!form.name?.trim()) return toasts.error('Введите название тарифа');
+    if (form.price < 0) return toasts.error('Цена не может быть отрицательной');
+    if (form.duration_days < 1) return toasts.error('Дней должно быть не менее 1');
+    if (form.device_limit < 1) return toasts.error('Устройств должно быть не менее 1');
+    if (form.traffic_gb < 0) return toasts.error('Трафик не может быть отрицательным');
     try {
       if (editPlan) { await api.updatePlan(editPlan.id, form); toasts.success('Тариф обновлён'); }
       else { await api.createPlan(form); toasts.success('Тариф создан'); }
