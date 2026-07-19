@@ -382,7 +382,8 @@ class RemnawaveService(VpnPanelInterface):
                 raw = data
             elif isinstance(data, dict):
                 raw = (
-                    data.get("internal_squads", [])
+                    data.get("internalSquads", [])
+                    or data.get("internal_squads", [])
                     or data.get("squads", [])
                     or data.get("groups", [])
                     or []
@@ -401,7 +402,7 @@ class RemnawaveService(VpnPanelInterface):
                     "uuid": str(g.get("uuid", g.get("id", ""))),
                     "name": g.get("name", ""),
                     "inbound_tags": inbound_tags,
-                    "total_users": info.get("members_count", 0),
+                    "total_users": info.get("membersCount", info.get("members_count", 0)),
                     "is_disabled": g.get("is_disabled", False),
                 })
             return normalized
