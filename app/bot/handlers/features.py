@@ -10,7 +10,7 @@
 
 import asyncio
 from datetime import datetime, timezone
-from aiogram import Router, F
+from aiogram import Router, F, Bot
 from aiogram.filters import Command
 from aiogram.types import Message, CallbackQuery, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -21,11 +21,19 @@ from app.services.user import UserService
 from app.services.referral import ReferralService
 from app.services.bot_settings import BotSettingsService
 from app.services.payment import PaymentService
+from app.services.plan import PlanService
 from app.services.i18n import t, get_lang
 from app.bot.utils.subscription_links import subscription_link_kb
 from app.utils.html_utils import escape_html, html_code
 
 router = Router()
+
+
+async def _safe_answer(callback: CallbackQuery) -> None:
+    try:
+        await callback.answer()
+    except Exception:
+        pass
 
 
 def _fmt_traffic(bytes_val: int) -> str:
@@ -115,6 +123,15 @@ async def cmd_status(message: Message) -> None:
         lines.append("")
 
     builder = InlineKeyboardBuilder()
+    for k in keys:
+        if k.plan_id and k.expires_at:
+            renew_text = t("btn_renew", lang) if t("btn_renew", lang) != "btn_renew" else "🔄 Продлить"
+            builder.row(
+                InlineKeyboardButton(
+                    text=f"{renew_text} — {escape_html(k.name or f'#{k.id}')}",
+                    callback_data=f"renew:{k.id}",
+                )
+            )
     builder.row(
         InlineKeyboardButton(text=t("btn_my_keys", lang), callback_data="my_keys")
     )
@@ -131,7 +148,155 @@ async def cb_status(callback: CallbackQuery) -> None:
         await callback.answer()
     except Exception:
         pass
+    if not callback.message:
+        return
+    callback.message.from_user = callback.from_user
     await cmd_status(callback.message)
+
+
+# ── Renew key from /status ──────────────────────────────────────────────────
+
+
+@router.callback_query(F.data.startswith("renew:"))
+async def handle_renew(callback: CallbackQuery) -> None:
+    key_id = int(callback.data.split(":")[1])
+
+    async with AsyncSessionFactory() as session:
+        key = await VpnKeyService(session).get_by_id(key_id)
+        if not key or key.user_id != callback.from_user.id:
+            try:
+                await callback.answer("❌ Ключ не найден", show_alert=True)
+            except Exception:
+                pass
+            return
+        if not key.plan_id:
+            try:
+                await callback.answer("❌ Тариф не привязан к ключу", show_alert=True)
+            except Exception:
+                pass
+            return
+        plan = await PlanService(session).get_by_id(key.plan_id)
+        user = await UserService(session).get_by_id(callback.from_user.id)
+        settings = await BotSettingsService(session).get_all()
+        svc = BotSettingsService(session)
+        user_lang = user.language if user and user.language else None
+        lang = get_lang(settings, user_lang)
+        user_balance = float(user.balance or 0) if user else 0.0
+
+        _yk_toggle = (await svc.get("ps_yookassa_enabled") or "0") == "1"
+        _sbp_toggle = (await svc.get("ps_sbp_enabled") or "0") == "1"
+        _yk_shop_db = await svc.get("yookassa_shop_id_override") or ""
+        _yk_key_db = bool(await svc.get("yookassa_secret_key_override"))
+        _stars_rate = float(await svc.get("stars_rate") or "1.5")
+        _yk_configured = bool(_yk_shop_db and _yk_key_db)
+        has_yookassa = _yk_toggle and _yk_configured
+        has_sbp = _sbp_toggle and _yk_configured
+
+        has_cryptobot = (
+            bool((await svc.get("cryptobot_token") or "").strip())
+            and (await svc.get("ps_cryptobot_enabled") or "0") == "1"
+        )
+        _fk_toggle = (await svc.get("ps_freekassa_enabled") or "0") == "1"
+        _fk_shop = await svc.get("freekassa_shop_id") or ""
+        _fk_key = await svc.get("freekassa_api_key") or ""
+        has_freekassa = _fk_toggle and bool(_fk_shop and _fk_key)
+
+        _pl_toggle = (await svc.get("ps_platega_enabled") or "0") == "1"
+        _pl_merchant = await svc.get("platega_merchant_id") or ""
+        _pl_secret = await svc.get("platega_secret") or ""
+        has_platega = _pl_toggle and bool(_pl_merchant and _pl_secret)
+
+    if not plan or not plan.is_active:
+        try:
+            await callback.answer("❌ Тариф недоступен", show_alert=True)
+        except Exception:
+            pass
+        return
+
+    try:
+        await callback.answer()
+    except Exception:
+        pass
+
+    from app.services.telegram_stars import TelegramStarsService
+    from app.bot.utils.media import edit_with_photo
+
+    stars = TelegramStarsService.rub_to_stars(float(plan.price), rate=_stars_rate)
+
+    renew_label = t("choose_payment", lang, plan_name=escape_html(plan.name), price=float(plan.price))
+
+    renew_builder = InlineKeyboardBuilder()
+    if has_yookassa:
+        renew_builder.row(InlineKeyboardButton(text="💳 Банковская карта", callback_data=f"renew_pay:yookassa:{plan.id}:{key_id}"))
+    if has_sbp:
+        renew_builder.row(InlineKeyboardButton(text="🏦 СБП", callback_data=f"renew_pay:sbp:{plan.id}:{key_id}"))
+    if has_freekassa:
+        renew_builder.row(InlineKeyboardButton(text="💸 FreeKassa", callback_data=f"renew_pay:freekassa:{plan.id}:{key_id}"))
+    if has_platega:
+        renew_builder.row(InlineKeyboardButton(text="🟦 Platega", callback_data=f"renew_pay:platega:{plan.id}:{key_id}"))
+    renew_builder.row(InlineKeyboardButton(text=f"⭐ Telegram Stars ({stars} ⭐)", callback_data=f"renew_pay:stars:{plan.id}:{key_id}"))
+    if has_cryptobot:
+        renew_builder.row(InlineKeyboardButton(text="₿ CryptoBot", callback_data=f"renew_pay:crypto:{plan.id}:{key_id}"))
+    if user_balance > 0 and user_balance >= float(plan.price):
+        renew_builder.row(InlineKeyboardButton(text=f"💰 Оплатить с баланса ({user_balance:.2f} ₽)", callback_data=f"renew_pay:balance:{plan.id}:{key_id}"))
+    renew_builder.row(InlineKeyboardButton(text="◀️ Назад", callback_data="status_cmd"))
+
+    await edit_with_photo(callback, renew_label, reply_markup=renew_builder.as_markup())
+
+
+# ── Renew payment handlers ───────────────────────────────────────────────────
+
+
+@router.callback_query(F.data.startswith("renew_pay:balance:"))
+async def handle_renew_balance(callback: CallbackQuery, bot: Bot) -> None:
+    parts = callback.data.split(":")
+    plan_id, key_id = int(parts[2]), int(parts[3])
+
+    await _safe_answer(callback)
+
+    async with AsyncSessionFactory() as session:
+        plan = await PlanService(session).get_by_id(plan_id)
+        if not plan or not plan.is_active:
+            await bot.send_message(callback.from_user.id, "❌ Тариф недоступен")
+            return
+
+        updated = await UserService(session).deduct_balance(callback.from_user.id, plan.price)
+        if not updated:
+            await bot.send_message(callback.from_user.id, "❌ Недостаточно средств")
+            return
+
+        import json
+        from app.models.payment import PaymentProvider
+        payment = await PaymentService(session).create_pending(
+            user_id=callback.from_user.id, plan=plan, provider=PaymentProvider.BALANCE,
+        )
+        payment.meta = json.dumps({"extend_key_id": str(key_id)})
+        await session.flush()
+
+        confirmation = await PaymentService(session).confirm_once(payment.id, f"balance_{payment.id}")
+        if not confirmation.payment:
+            await UserService(session).add_balance(callback.from_user.id, plan.price)
+            await session.rollback()
+            await bot.send_message(callback.from_user.id, "❌ Ошибка оплаты")
+            return
+
+        from app.services.payment_fulfillment import PaymentFulfillmentService
+        delivery = await PaymentFulfillmentService(session).extend_subscription_once(
+            payment.id, callback.from_user.id, key_id, plan
+        )
+        if not delivery.key:
+            await UserService(session).add_balance(callback.from_user.id, plan.price)
+            await PaymentService(session).fail(payment.id)
+            await session.commit()
+            await bot.send_message(callback.from_user.id, "❌ Не удалось продлить. Баланс возвращён.")
+            return
+
+        key = delivery.key
+        await session.commit()
+
+    exp = key.expires_at.strftime("%d.%m.%Y") if key.expires_at else "—"
+    text = f"✅ <b>Подписка продлена!</b>\n\n📅 Новая дата: <b>{exp}</b>\n➕ +{plan.duration_days} дней"
+    await bot.send_message(callback.from_user.id, text, parse_mode="HTML")
 
 
 # ── /payments — история платежей ─────────────────────────────────────────────
@@ -217,6 +382,9 @@ async def cb_payments(callback: CallbackQuery) -> None:
         await callback.answer()
     except Exception:
         pass
+    if not callback.message:
+        return
+    callback.message.from_user = callback.from_user
     await cmd_payments(callback.message)
 
 
