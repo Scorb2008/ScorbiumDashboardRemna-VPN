@@ -1342,12 +1342,26 @@ async def admin_search_result(message: Message, state: FSMContext) -> None:
 async def admin_ban_user(callback: CallbackQuery) -> None:
     if not _is_admin(callback.from_user.id):
         return
-    user_id = int(callback.data.split(":")[2])
-    if (
-        user_id == callback.from_user.id
-        or user_id in config.telegram.telegram_admin_ids
-    ):
-        await callback.answer("❌ Нельзя забанить администратора", show_alert=True)
+    parts = callback.data.split(":")
+    user_id = int(parts[2])
+    if len(parts) == 3:
+        if (
+            user_id == callback.from_user.id
+            or user_id in config.telegram.telegram_admin_ids
+        ):
+            await callback.answer("❌ Нельзя забанить администратора", show_alert=True)
+            return
+        builder = InlineKeyboardBuilder()
+        builder.row(
+            InlineKeyboardButton(text="⚠️ Да, забанить", callback_data=f"adm:ban:{user_id}:confirm"),
+            InlineKeyboardButton(text="◀️ Отмена", callback_data=f"adm:user:{user_id}"),
+        )
+        await callback.message.edit_text(
+            f"⚠️ <b>Заблокировать пользователя {user_id}?</b>\n\n"
+            "Пользователь потеряет доступ к боту и получит уведомление о блокировке.",
+            reply_markup=builder.as_markup(),
+            parse_mode="HTML",
+        )
         return
     async with AsyncSessionFactory() as session:
         await UserService(session).ban(user_id)
@@ -1590,6 +1604,20 @@ async def admin_reset_key_hwids(callback: CallbackQuery) -> None:
     parts = callback.data.split(":")
     key_id, user_id = int(parts[2]), int(parts[3])
 
+    if len(parts) == 4:
+        builder = InlineKeyboardBuilder()
+        builder.row(
+            InlineKeyboardButton(text="⚠️ Да, сбросить", callback_data=f"adm:resethwid:{key_id}:{user_id}:confirm"),
+            InlineKeyboardButton(text="◀️ Отмена", callback_data=f"adm:keydetail:{key_id}:{user_id}"),
+        )
+        await callback.message.edit_text(
+            f"⚠️ <b>Сбросить все HWID для ключа #{key_id}?</b>\n\n"
+            "Все устройства будут отключены. Пользователю придётся заново регистрировать устройства.",
+            reply_markup=builder.as_markup(),
+            parse_mode="HTML",
+        )
+        return
+
     async with AsyncSessionFactory() as session:
         key = await VpnKeyService(session).get_by_id(key_id)
 
@@ -1623,6 +1651,21 @@ async def admin_revoke_key(callback: CallbackQuery) -> None:
         return
     parts = callback.data.split(":")
     key_id, user_id = int(parts[2]), int(parts[3])
+
+    if len(parts) == 4:
+        builder = InlineKeyboardBuilder()
+        builder.row(
+            InlineKeyboardButton(text="⚠️ Да, отключить", callback_data=f"adm:revokekey:{key_id}:{user_id}:confirm"),
+            InlineKeyboardButton(text="◀️ Отмена", callback_data=f"adm:keydetail:{key_id}:{user_id}"),
+        )
+        await callback.message.edit_text(
+            f"⚠️ <b>Отключить ключ #{key_id}?</b>\n\n"
+            "Пользователь потеряет доступ к VPN. Действие необратимо.",
+            reply_markup=builder.as_markup(),
+            parse_mode="HTML",
+        )
+        return
+
     async with AsyncSessionFactory() as session:
         key = await VpnKeyService(session).revoke(key_id)
         await session.commit()

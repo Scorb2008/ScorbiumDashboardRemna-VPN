@@ -1,6 +1,6 @@
 """REST API endpoints for settings and configuration."""
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 from typing import Optional
@@ -20,6 +20,41 @@ _SENSITIVE_KEYS = frozenset({
     "aikassa_token",
     "platega_secret",
     "paypalych_api_token",
+})
+
+_ALLOWED_SETTINGS_KEYS = frozenset({
+    "welcome_message", "ban_message", "bot_disabled_message",
+    "btn_order", "keyboard_layout",
+    "btn_buy", "btn_my_keys", "btn_status",
+    "btn_payments", "btn_profile", "btn_support", "btn_language", "btn_trial",
+    "btn_gift", "btn_extend", "btn_balance", "btn_language_label",
+    "btn_buy_label", "btn_my_keys_label", "btn_status_label",
+    "btn_payments_label", "btn_profile_label", "btn_support_label",
+    "btn_trial_label", "btn_gift_label", "btn_extend_label",
+    "btn_balance_label",
+    "btn_buy_emoji", "btn_my_keys_emoji", "btn_status_emoji",
+    "btn_payments_emoji", "btn_profile_emoji", "btn_support_emoji",
+    "btn_trial_emoji", "btn_gift_emoji", "btn_extend_emoji",
+    "btn_balance_emoji",
+    "btn_buy_style", "btn_my_keys_style", "btn_status_style",
+    "btn_payments_style", "btn_profile_style", "btn_support_style",
+    "btn_trial_style", "btn_gift_style", "btn_extend_style",
+    "btn_balance_style",
+    "ps_sbp_enabled",
+    "trial_enabled", "trial_days", "trial_label",
+    "maintenance_mode", "maintenance_message",
+    "notify_monitoring_enabled", "notify_svc_database", "notify_svc_telegram_bot",
+    "notify_svc_vpn_panel", "notify_svc_yookassa", "notify_svc_cryptobot",
+    "notify_svc_freekassa", "notify_cooldown_seconds", "notify_on_degraded",
+    "notify_expiry_enabled", "notify_expiry_days", "notify_expiry_message",
+    "notify_chat_ids",
+    "bot_enabled", "bot_language",
+    "referral_bonus_type", "referral_bonus_value",
+    "traffic_abuse_threshold_gb", "traffic_abuse_speed_limit_mbps",
+    "required_channel_id", "required_channel_name",
+    "logo_url",
+    "photo_welcome", "photo_buy", "photo_my_keys", "photo_balance",
+    "photo_about", "photo_support", "photo_profile", "photo_language", "photo_trial",
 })
 
 
@@ -57,6 +92,9 @@ async def update_settings(
     db: AsyncSession = Depends(get_db),
     _admin=Depends(get_current_admin),
 ):
+    invalid_keys = [k for k in body if k not in _ALLOWED_SETTINGS_KEYS]
+    if invalid_keys:
+        raise HTTPException(status_code=400, detail=f"Unknown settings keys: {', '.join(invalid_keys[:10])}")
     svc = BotSettingsService(db)
     await svc.set_many(body)
     await db.commit()

@@ -1,12 +1,28 @@
 """REST API endpoints for admin management."""
 
+from typing import Literal, Optional
+
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.dependencies import get_db, get_current_admin
+from app.api.dependencies import get_db, get_current_admin, require_role
 from app.services.admin import AdminService
 
 router = APIRouter()
+
+
+class AdminCreateBody(BaseModel):
+    username: str = Field(..., min_length=3, max_length=64)
+    password: str = Field(..., min_length=8, max_length=128)
+    role: Literal["manager", "operator"] = "operator"
+
+
+class AdminUpdateBody(BaseModel):
+    username: Optional[str] = Field(None, min_length=3, max_length=64)
+    password: Optional[str] = Field(None, min_length=8, max_length=128)
+    role: Optional[Literal["manager", "operator"]] = None
+    is_active: Optional[bool] = None
 
 
 @router.get("/")
@@ -47,26 +63,15 @@ async def current_admin(
 
 @router.post("/")
 async def create_admin(
-    body: dict,
+    body: AdminCreateBody,
     db: AsyncSession = Depends(get_db),
-    admin: dict = Depends(get_current_admin),
+    admin: dict = Depends(require_role("superadmin")),
 ):
-    if admin.get("role") != "superadmin":
-        raise HTTPException(status_code=403, detail="Only superadmin can create admins")
-    username = body.get("username", "").strip()
-    password = body.get("password", "").strip()
-    role = body.get("role", "operator")
-    if not username or not password:
-        raise HTTPException(status_code=400, detail="Username and password required")
-    if role not in ("superadmin", "manager", "operator"):
-        raise HTTPException(status_code=400, detail="Invalid role")
-    if role == "superadmin":
-        raise HTTPException(status_code=403, detail="Cannot create superadmin via API")
     svc = AdminService(db)
-    existing = await svc.get_by_username(username)
+    existing = await svc.get_by_username(body.username.strip())
     if existing:
         raise HTTPException(status_code=409, detail="Admin already exists")
-    a = await svc.create(username=username, password=password, role=role)
+    a = await svc.create(username=body.username.strip(), password=body.password, role=body.role)
     await db.commit()
     return {
         "id": a.id,
@@ -79,33 +84,29 @@ async def create_admin(
 @router.patch("/{admin_id}")
 async def update_admin(
     admin_id: int,
-    body: dict,
+    body: AdminUpdateBody,
     db: AsyncSession = Depends(get_db),
-    admin: dict = Depends(get_current_admin),
+    admin: dict = Depends(require_role("superadmin")),
 ):
-    if admin.get("role") != "superadmin":
-        raise HTTPException(status_code=403, detail="Only superadmin can update admins")
     svc = AdminService(db)
     target = await svc.get_by_id(admin_id)
     if not target:
         raise HTTPException(status_code=404, detail="Admin not found")
-    if admin["sub"] == target.username:
-        new_role = body.get("role")
-        if new_role and new_role != "superadmin":
-            raise HTTPException(status_code=400, detail="Cannot demote yourself")
+    if admin["sub"] == target.username and body.role and body.role != "superadmin":
+        raise HTTPException(status_code=400, detail="Cannot demote yourself")
     updates = {}
-    if "username" in body:
-        updates["username"] = body["username"]
-    if "password" in body and body["password"]:
-        updates["password"] = body["password"]
-    if "role" in body:
-        if body["role"] == "superadmin":
-            raise HTTPException(status_code=403, detail="Cannot promote to superadmin via API")
-        updates["role"] = body["role"]
-    if "is_active" in body:
-        updates["is_active"] = body["is_active"]
+    if body.username is not None:
+        updates["username"] = body.username.strip()
+    if body.password is not None:
+        updates["password"] = body.password
+    if body.role is not None:
+        updates["role"] = body.role
+    if body.is_active is not None:
+        updates["is_active"] = body.is_active
+    if not updates:
+        return {"ok": True}
     updated = await svc.update(admin_id, **updates)
-    if "password" in body and body.get("password"):
+    if body.password:
         from app.services.token_blacklist import TokenBlacklistService
         await TokenBlacklistService(db).blacklist_all_for_user(target.username)
     await db.commit()
@@ -116,10 +117,8 @@ async def update_admin(
 async def delete_admin(
     admin_id: int,
     db: AsyncSession = Depends(get_db),
-    admin: dict = Depends(get_current_admin),
+    admin: dict = Depends(require_role("superadmin")),
 ):
-    if admin.get("role") != "superadmin":
-        raise HTTPException(status_code=403, detail="Only superadmin can delete admins")
     svc = AdminService(db)
     target = await svc.get_by_id(admin_id)
     if not target:

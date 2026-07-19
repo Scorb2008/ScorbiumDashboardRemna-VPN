@@ -143,6 +143,9 @@ def _make_dp():
     import app.bot.handlers.trial as _trial
 
     dp = Dispatcher()
+    from app.bot.middlewares.null_message import NullMessageMiddleware
+
+    dp.update.outer_middleware(NullMessageMiddleware())
     dp.update.outer_middleware(BanCheckMiddleware())
     dp.update.outer_middleware(ThrottleMiddleware())
     dp.update.outer_middleware(ChannelCheckMiddleware())

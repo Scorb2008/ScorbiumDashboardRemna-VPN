@@ -97,7 +97,10 @@ async def select_plan(callback: CallbackQuery) -> None:
         has_platega = _pl_toggle and bool(_pl_merchant and _pl_secret)
 
     if not plan or not plan_is_active:
-        await _safe_answer(callback)
+        try:
+            await callback.answer(t("plan_unavailable", lang), show_alert=True)
+        except Exception:
+            pass
         return
 
     from app.services.telegram_stars import TelegramStarsService
