@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from typing import Optional
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, func
 from app.models.audit_log import AuditLog
 
 
@@ -34,6 +34,29 @@ class AuditService:
             query = query.limit(limit)
         result = await self.session.execute(query)
         return list(result.scalars().all())
+
+    async def get_paginated(
+        self,
+        limit: int = 50,
+        offset: int = 0,
+        action: Optional[str] = None,
+        admin_id: Optional[int] = None,
+    ) -> tuple[list[AuditLog], int]:
+        query = select(AuditLog)
+        count_query = select(func.count()).select_from(AuditLog)
+        filters = []
+        if action is not None:
+            filters.append(AuditLog.action == action)
+        if admin_id is not None:
+            filters.append(AuditLog.admin_id == admin_id)
+        if filters:
+            from sqlalchemy import and_
+            query = query.where(and_(*filters))
+            count_query = count_query.where(and_(*filters))
+        total = (await self.session.execute(count_query)).scalar_one()
+        query = query.order_by(desc(AuditLog.created_at)).offset(offset).limit(limit)
+        result = await self.session.execute(query)
+        return list(result.scalars().all()), total
 
     async def get_for_target(
         self, target_type: str, target_id: int, limit: int = 10

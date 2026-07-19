@@ -21,6 +21,12 @@ class AdminService:
         )
         return result.scalar_one_or_none()
 
+    async def get_by_ids(self, ids: list[int]) -> list[Admin]:
+        if not ids:
+            return []
+        result = await self.session.execute(select(Admin).where(Admin.id.in_(ids)))
+        return list(result.scalars().all())
+
     async def get_all(self) -> list[Admin]:
         result = await self.session.execute(select(Admin).order_by(Admin.id))
         return list(result.scalars().all())

@@ -22,6 +22,7 @@
   import Settings from './pages/Settings.svelte';
   import Database from './pages/Database.svelte';
   import Admins from './pages/Admins.svelte';
+  import Audit from './pages/Audit.svelte';
 
   let currentPath = $state('/dashboard');
   let authenticated = $state(api.isAuthenticated);
@@ -155,6 +156,8 @@
             <Database />
           {:else if currentPath === '/admins'}
             <Admins />
+          {:else if currentPath === '/audit'}
+            <Audit />
           {:else}
             <Dashboard />
           {/if}

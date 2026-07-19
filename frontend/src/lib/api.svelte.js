@@ -183,7 +183,9 @@ class ApiClient {
   // Database
   getDatabaseStats() { return this.get('/database/stats'); }
   exportDatabase(format = 'sql') { return this.request('GET', '/database/export', { params: { format }, raw: true }); }
-  clearDatabase() { return this.post('/database/clear'); }
+  exportUsersCsv() { return this.request('GET', '/database/export/users', { raw: true }); }
+  exportPaymentsCsv() { return this.request('GET', '/database/export/payments', { raw: true }); }
+  clearDatabase() { return this.post('/database/clear', { confirm: 'DELETE EVERYTHING' }); }
 
   // Settings
   getSettings() { return this.get('/settings/'); }
@@ -193,6 +195,9 @@ class ApiClient {
   configurePaymentSystem(name, data) { return this.post(`/settings/payment-systems/${name}/configure`, data); }
   testPaymentSystem(name) { return this.post(`/settings/payment-systems/${name}/test`); }
   getAppConfig() { return this.get('/settings/config'); }
+
+  // Audit
+  getAuditLogs(params) { return this.get('/audit/', params); }
 }
 
 export const api = new ApiClient();

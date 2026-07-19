@@ -54,6 +54,7 @@
         { path: '/support', label: 'Поддержка', icon: 'headset' },
         { path: '/database', label: 'База данных', icon: 'database' },
         { path: '/admins', label: 'Администраторы', icon: 'shield' },
+        { path: '/audit', label: 'Журнал', icon: 'activity' },
       ],
     },
   ];

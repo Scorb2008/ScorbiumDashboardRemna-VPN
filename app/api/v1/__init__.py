@@ -17,6 +17,7 @@ from .remnawave import router as remnawave_router
 from .admins import router as admins_router
 from .database import router as database_router
 from .settings import router as settings_router
+from .audit import router as audit_router
 
 
 def get_router() -> APIRouter:
@@ -43,5 +44,6 @@ def get_router() -> APIRouter:
     api_router.include_router(admins_router, prefix="/admins", tags=["Admins"])
     api_router.include_router(database_router, prefix="/database", tags=["Database"])
     api_router.include_router(settings_router, prefix="/settings", tags=["Settings"])
+    api_router.include_router(audit_router, prefix="/audit", tags=["Audit"])
 
     return api_router
