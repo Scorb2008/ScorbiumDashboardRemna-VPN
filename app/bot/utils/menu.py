@@ -251,20 +251,20 @@ async def get_main_menu_kb(
     # Translate labels
     layout = _translate_layout(layout, lang, s)
 
-    # Load styles (support both btn_style_{bid} and btn_{bid}_style)
+    # Load styles — SPA saves as btn_{bid}_style, legacy used btn_style_{bid}
     styles = {}
     for bid in _BUTTON_IDS:
-        style = s.get(f"btn_style_{bid}", "").strip()
+        style = s.get(f"btn_{bid}_style", "").strip()
         if not style:
-            style = s.get(f"btn_{bid}_style", "").strip()
+            style = s.get(f"btn_style_{bid}", "").strip()
         styles[bid] = style
 
-    # Load custom emojis (support both btn_emoji_{bid} and btn_icon_{bid})
+    # Load custom emojis — SPA saves as btn_icon_{bid}, legacy used btn_emoji_{bid}
     emojis = {}
     for bid in _BUTTON_IDS:
-        emoji = s.get(f"btn_emoji_{bid}", "").strip()
+        emoji = s.get(f"btn_icon_{bid}", "").strip()
         if not emoji:
-            emoji = s.get(f"btn_icon_{bid}", "").strip()
+            emoji = s.get(f"btn_emoji_{bid}", "").strip()
         emojis[bid] = emoji
 
     return main_menu_kb(
