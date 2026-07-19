@@ -17,13 +17,30 @@ LOGIN_WINDOW = 300
 LOGIN_MAX_ATTEMPTS = 10
 BLOCK_DURATION = 300
 
+# Per-user cabinet rate limiting
+CABINET_USER_WINDOW = 60
+CABINET_USER_MAX_REQUESTS = 30
+
 
 _WHITELIST_PREFIXES = ("/docs", "/redoc", "/openapi")
 _WHITELIST_EXACT = {"/health", "/api/v1/health/", "/favicon.ico"}
 _PANEL_LOGIN_PATHS = {
     config.web.panel_login_path,
     f"{config.web.panel_prefix}/api/login",
+    "/api/v1/auth/login",
 }
+
+
+def _extract_user_id_from_cookie(request: Request) -> int | None:
+    """Extract user_id from the cabinet session cookie."""
+    cookie = request.cookies.get("cabinet_session") or request.headers.get("X-Cabinet-User")
+    if not cookie:
+        return None
+    try:
+        uid = int(cookie.split(":")[0])
+        return uid if uid > 0 else None
+    except (ValueError, IndexError):
+        return None
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
@@ -32,6 +49,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self._panel_hits: dict[str, deque] = defaultdict(deque)
         self._api_hits: dict[str, deque] = defaultdict(deque)
         self._login_hits: dict[str, deque] = defaultdict(deque)
+        self._cabinet_user_hits: dict[int, deque] = defaultdict(deque)
+        self._cabinet_user_blocked: dict[int, float] = {}
         self._blocked: dict[str, float] = {}
         self._last_cleanup = time.monotonic()
 
@@ -49,6 +68,22 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         hits.append(now)
         if len(hits) > max_req:
             self._blocked[ip] = now + BLOCK_DURATION
+            return True
+        return False
+
+    def _check_cabinet_user(self, user_id: int) -> bool:
+        now = time.monotonic()
+        if user_id in self._cabinet_user_blocked:
+            if now < self._cabinet_user_blocked[user_id]:
+                return True
+            del self._cabinet_user_blocked[user_id]
+        hits = self._cabinet_user_hits[user_id]
+        cutoff = now - CABINET_USER_WINDOW
+        while hits and hits[0] < cutoff:
+            hits.popleft()
+        hits.append(now)
+        if len(hits) > CABINET_USER_MAX_REQUESTS:
+            self._cabinet_user_blocked[user_id] = now + BLOCK_DURATION
             return True
         return False
 
@@ -73,11 +108,27 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             for key in stale_keys:
                 storage.pop(key, None)
 
+        cabinet_cutoff = now - CABINET_USER_WINDOW
+        stale_users = []
+        for uid, hits in self._cabinet_user_hits.items():
+            while hits and hits[0] < cabinet_cutoff:
+                hits.popleft()
+            if not hits:
+                stale_users.append(uid)
+        for uid in stale_users:
+            self._cabinet_user_hits.pop(uid, None)
+
         expired_blocks = [
             ip for ip, blocked_until in self._blocked.items() if blocked_until <= now
         ]
         for ip in expired_blocks:
             self._blocked.pop(ip, None)
+
+        expired_user_blocks = [
+            uid for uid, until in self._cabinet_user_blocked.items() if until <= now
+        ]
+        for uid in expired_user_blocks:
+            self._cabinet_user_blocked.pop(uid, None)
 
     def _is_rate_limited(self, ip: str, path: str, method: str) -> bool:
         now = time.monotonic()
@@ -165,4 +216,22 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 media_type="text/html",
                 headers={"Retry-After": str(BLOCK_DURATION)},
             )
+
+        # Per-user cabinet rate limiting (non-IP)
+        if path.startswith("/cabinet/") and path != "/cabinet/auth" and request.method != "GET":
+            user_id = _extract_user_id_from_cookie(request)
+            if user_id and self._check_cabinet_user(user_id):
+                if request.headers.get("accept", "").startswith("application/json"):
+                    return JSONResponse(
+                        {"detail": "Too many requests. Try again later."},
+                        status_code=429,
+                        headers={"Retry-After": str(CABINET_USER_WINDOW)},
+                    )
+                return Response(
+                    content="Too many requests. Try again later.",
+                    status_code=429,
+                    media_type="text/plain",
+                    headers={"Retry-After": str(CABINET_USER_WINDOW)},
+                )
+
         return await call_next(request)
