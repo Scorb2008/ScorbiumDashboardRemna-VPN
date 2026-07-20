@@ -127,6 +127,37 @@ async def cmd_start(message: Message) -> None:
                 if ref:
                     await ref_svc.pay_bonus(ref.id)
 
+                    if referrer and referrer.id:
+                        try:
+                            welcome_msg = await settings_svc.get("referral_welcome_message")
+                            if welcome_msg:
+                                from html import escape as _esc
+                                referred_name = _esc(message.from_user.full_name or message.from_user.username or "Пользователь")
+                                bonus_desc = ""
+                                if bonus_type == "days":
+                                    bonus_desc = f"{int(bonus_value)} дн."
+                                elif bonus_type == "balance":
+                                    bonus_desc = f"{bonus_value} ₽"
+                                elif bonus_type == "percent":
+                                    bonus_desc = f"{bonus_value}%"
+                                try:
+                                    text = welcome_msg.format(
+                                        name=referred_name,
+                                        bonus=bonus_desc,
+                                        username=_esc(message.from_user.username or ""),
+                                    )
+                                except Exception:
+                                    text = welcome_msg
+                                from aiogram import Bot
+                                from app.core.config import config
+                                bot = Bot(token=config.telegram.telegram_bot_token.get_secret_value())
+                                await bot.send_message(referrer.id, text, parse_mode="HTML")
+                                await bot.session.close()
+                        except Exception:
+                            pass
+                        except Exception:
+                            pass
+
         await session.commit()
 
         if created:

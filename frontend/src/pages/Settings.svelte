@@ -20,6 +20,7 @@
     { id: 'notifications', label: 'Уведомления', icon: 'bell' },
     { id: 'monitoring', label: 'Мониторинг', icon: 'activity' },
     { id: 'trial', label: 'Пробный период', icon: 'zap' },
+    { id: 'referrals', label: 'Рефералы', icon: 'users' },
   ];
 
   const PAYMENT_SYSTEMS = [
@@ -628,6 +629,132 @@
 
           <button
             onclick={() => saveSettingsSection(TRIAL_FIELDS.map(f => f.key))}
+            disabled={saving._section}
+            class="btn btn-primary btn-sm"
+          >
+            {#if saving._section}
+              <div class="w-4 h-4 border-2 border-surface-4 border-t-white rounded-full animate-spin"></div>
+            {/if}
+            Сохранить все
+          </button>
+        </div>
+
+      {:else if activeTab === 'referrals'}
+        <div class="space-y-4">
+          <div>
+            <h2 class="text-[17px] font-semibold flex items-center gap-2">
+              <Icon name="users" class="w-5 h-5 text-accent" /> Реферальная программа
+            </h2>
+            <p class="text-[13px] text-muted mt-0.5">Настройка вознаграждений за приглашение пользователей</p>
+          </div>
+
+          <!-- Bonus type & value -->
+          <div class="card p-5 space-y-5">
+            <h3 class="text-[14px] font-semibold">Вознаграждение за реферала</h3>
+
+            <div class="space-y-1">
+              <label class="label"><span class="label-text text-[13px]">Тип бонуса</span></label>
+              <select
+                bind:value={botSettings['referral_bonus_type']}
+                class="select w-full text-[13px]"
+              >
+                <option value="days">Дни подписки (продлить VPN ключ реферера)</option>
+                <option value="balance">Баланс (начислить рубли на баланс)</option>
+                <option value="percent">Баланс (%)</option>
+              </select>
+              <p class="text-[11px] text-muted mt-1">
+                {#if botSettings['referral_bonus_type'] === 'days'}
+                  Реферер получит продление текущей подписки на указанное количество дней
+                {:else if botSettings['referral_bonus_type'] === 'balance'}
+                  На баланс реферера будет начислена фиксированная сумма в рублях
+                {:else}
+                  На баланс реферера будет начислен процент от суммы (значение — размер процента)
+                {/if}
+              </p>
+            </div>
+
+            <div class="space-y-1">
+              <label class="label"><span class="label-text text-[13px]">
+                {#if botSettings['referral_bonus_type'] === 'days'}
+                  Количество дней
+                {:else if botSettings['referral_bonus_type'] === 'balance'}
+                  Сумма (₽)
+                {:else}
+                  Процент (%)
+                {/if}
+              </span></label>
+              <input
+                type="number"
+                bind:value={botSettings['referral_bonus_value']}
+                class="input w-full text-[13px]"
+                min="0"
+                max="999999"
+                placeholder="3"
+              />
+            </div>
+
+            <div class="bg-surface-2/50 rounded-[10px] p-4 border border-surface-4/30">
+              <div class="flex items-start gap-3">
+                <Icon name="info" class="w-4 h-4 text-accent mt-0.5 shrink-0" />
+                <div class="text-[12px] text-muted space-y-1">
+                  <p><b class="text-text">Текущая настройка:</b>
+                    {#if botSettings['referral_bonus_type'] === 'days'}
+                      <span class="text-accent">{botSettings['referral_bonus_value'] || '3'} дн.</span> продление подписки
+                    {:else if botSettings['referral_bonus_type'] === 'balance'}
+                      <span class="text-accent">{botSettings['referral_bonus_value'] || '3'} ₽</span> на баланс
+                    {:else}
+                      <span class="text-accent">{botSettings['referral_bonus_value'] || '3'}%</span> на баланс
+                    {/if}
+                  </p>
+                  <p>Бонус начисляется <b class="text-text">рефереру</b> (тому, кто пригласил) при регистрации нового пользователя по реферальной ссылке.</p>
+                  <p>Если тип — «Дни» и у реферера нет активной подписки, бонус не будет начислен.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Welcome message -->
+          <div class="card p-5 space-y-4">
+            <h3 class="text-[14px] font-semibold">Уведомление рефереру</h3>
+            <p class="text-[12px] text-muted">Текст, который получит реферер при успешном приглашении</p>
+
+            <textarea
+              value={botSettings['referral_welcome_message'] ?? ''}
+              oninput={(e) => botSettings['referral_welcome_message'] = e.target.value}
+              class="textarea w-full text-[13px]"
+              rows="5"
+              placeholder="🎉 По вашей реферальной ссылке зарегистрировался новый пользователь!"
+            ></textarea>
+            <p class="text-[11px] text-muted">
+              Переменные: <code class="bg-surface-3 px-1 rounded text-[10px]">{'{name}'}</code> — имя приглашённого,
+              <code class="bg-surface-3 px-1 rounded text-[10px]">{'{username}'}</code> — username,
+              <code class="bg-surface-3 px-1 rounded text-[10px]">{'{bonus}'}</code> — размер бонуса
+            </p>
+          </div>
+
+          <!-- Limits -->
+          <div class="card p-5 space-y-4">
+            <h3 class="text-[14px] font-semibold">Лимиты</h3>
+
+            <div class="space-y-1">
+              <label class="label"><span class="label-text text-[13px]">Макс. рефералов на пользователя</span></label>
+              <input
+                type="number"
+                bind:value={botSettings['referral_max_per_user']}
+                class="input w-full text-[13px]"
+                min="1"
+                max="100000"
+                placeholder="500"
+              />
+              <p class="text-[11px] text-muted">Максимальное количество приглашённых пользователей для одного реферера (по умолчанию 500).</p>
+            </div>
+          </div>
+
+          <button
+            onclick={() => saveSettingsSection([
+              'referral_bonus_type', 'referral_bonus_value',
+              'referral_welcome_message', 'referral_max_per_user',
+            ])}
             disabled={saving._section}
             class="btn btn-primary btn-sm"
           >

@@ -38,6 +38,8 @@ DEFAULTS = {
     "referral_bonus_days": "3",
     "referral_bonus_type": "days",
     "referral_bonus_value": "3",
+    "referral_welcome_message": "🎉 По вашей реферальной ссылке зарегистрировался новый пользователь!\n\nВам начислен бонус.",
+    "referral_max_per_user": "500",
     "payment_success_message": "✅ Оплата прошла успешно!\n\nВаш VPN-ключ готов. Нажмите «Мои ключи».",
     "ban_message": "🚫 Ваш аккаунт заблокирован. Обратитесь в поддержку.",
     "bot_disabled_message": "🔧 Бот временно отключён. Попробуйте позже.",
