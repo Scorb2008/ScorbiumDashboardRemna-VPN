@@ -1,7 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import get_current_admin, get_db
+from app.models.plan import Plan
+from app.models.user import User
+from app.models.vpn_key import VpnKey
 from app.schemas.vpn import VpnKeyRead
 from app.services.vpn_key import VpnKeyService
 
@@ -20,7 +24,41 @@ async def list_subscriptions(
     svc = VpnKeyService(db)
     items = await svc.get_all(limit=limit, offset=offset)
     total = await svc.count()
-    return {"items": items, "total": total, "limit": limit, "offset": offset}
+
+    user_ids = list({k.user_id for k in items})
+    plan_ids = list({k.plan_id for k in items if k.plan_id})
+
+    users_map = {}
+    if user_ids:
+        res = await db.execute(select(User).where(User.id.in_(user_ids)))
+        users_map = {u.id: u for u in res.scalars().all()}
+
+    plans_map = {}
+    if plan_ids:
+        res = await db.execute(select(Plan).where(Plan.id.in_(plan_ids)))
+        plans_map = {p.id: p for p in res.scalars().all()}
+
+    result = []
+    for k in items:
+        user = users_map.get(k.user_id)
+        plan = plans_map.get(k.plan_id) if k.plan_id else None
+        result.append({
+            "id": k.id,
+            "user_id": k.user_id,
+            "user_full_name": user.full_name if user else None,
+            "user_username": user.username if user else None,
+            "plan_id": k.plan_id,
+            "plan_name": plan.name if plan else k.name,
+            "remnawave_key_id": k.remnawave_key_id,
+            "access_url": k.access_url,
+            "name": k.name,
+            "price": float(k.price) if k.price else 0,
+            "expires_at": k.expires_at.isoformat() if k.expires_at else None,
+            "status": k.status,
+            "created_at": k.created_at.isoformat() if k.created_at else None,
+        })
+
+    return {"items": result, "total": total, "limit": limit, "offset": offset}
 
 
 @router.get("/{key_id}", response_model=VpnKeyRead, summary="Get VPN key")
