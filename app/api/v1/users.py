@@ -93,7 +93,7 @@ async def give_key(
     return {"ok": True, "key_id": key.id, "user_id": user_id}
 
 
-@router.get("/", response_model=list[UserRead], summary="List users")
+@router.get("/", summary="List users")
 async def list_users(
     limit: int = 100,
     offset: int = 0,
