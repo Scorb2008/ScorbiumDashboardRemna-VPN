@@ -30,6 +30,14 @@
   let deleteTarget = $state(null);
   let confirmDeactivate = $state(false);
   let deactivateTarget = $state(null);
+  let confirmRevokePanel = $state(false);
+  let revokePanelTarget = $state(null);
+  let confirmResetTraffic = $state(false);
+  let resetTrafficTarget = $state(null);
+  let confirmExtend = $state(false);
+  let extendTarget = $state(null);
+  let extendDays = $state(30);
+  let actionLoading = $state({});
 
   async function loadSubscriptions() {
     loading = true;
@@ -52,7 +60,7 @@
   async function loadUsers() {
     usersLoading = true;
     try { users = await api.getUsers({ limit: 500 }); }
-    catch (e) { toasts.error('Ошибка загрузки пользователей'); }
+    catch (e) { tosts.error('Ошибка загрузки пользователей'); }
     finally { usersLoading = false; }
   }
 
@@ -68,7 +76,8 @@
           (s.user_username || '').toLowerCase().includes(search.toLowerCase()) ||
           (s.user_full_name || '').toLowerCase().includes(search.toLowerCase()) ||
           String(s.user_id).includes(search) ||
-          String(s.id).includes(search))
+          String(s.id).includes(search) ||
+          (s.remnawave_key_id || '').toLowerCase().includes(search.toLowerCase()))
       : subscriptions
   );
 
@@ -149,6 +158,55 @@
     deleteTarget = null;
   }
 
+  function askRevokePanel(sub) {
+    revokePanelTarget = sub;
+    confirmRevokePanel = true;
+  }
+
+  async function handleRevokePanel() {
+    if (!revokePanelTarget?.remnawave_key_id) return;
+    try {
+      await api.remnawaveRevoke(revokePanelTarget.remnawave_key_id);
+      toasts.success('Подписка отозвана в Remnawave');
+      await loadSubscriptions();
+    } catch (e) { toasts.error(e.message); }
+    confirmRevokePanel = false;
+    revokePanelTarget = null;
+  }
+
+  function askResetTraffic(sub) {
+    resetTrafficTarget = sub;
+    confirmResetTraffic = true;
+  }
+
+  async function handleResetTraffic() {
+    if (!resetTrafficTarget?.remnawave_key_id) return;
+    try {
+      await api.remnawaveResetTraffic(resetTrafficTarget.remnawave_key_id);
+      toasts.success('Трафик сброшен');
+    } catch (e) { toasts.error(e.message); }
+    confirmResetTraffic = false;
+    resetTrafficTarget = null;
+  }
+
+  function askExtend(sub) {
+    extendTarget = sub;
+    extendDays = 30;
+    confirmExtend = true;
+  }
+
+  async function handleExtend() {
+    if (!extendTarget?.remnawave_key_id) return;
+    if (!extendDays || extendDays < 1) return toasts.warning('Укажите количество дней');
+    try {
+      await api.remnawaveExtend(extendTarget.remnawave_key_id, parseInt(extendDays));
+      toasts.success(`Подписка продлена на ${extendDays} дней`);
+      await loadSubscriptions();
+    } catch (e) { toasts.error(e.message); }
+    confirmExtend = false;
+    extendTarget = null;
+  }
+
   function statusBadge(status) {
     switch (status) {
       case 'active': return 'badge-success';
@@ -172,6 +230,7 @@
     { key: 'user_id', label: 'Пользователь', sortable: true, render: (r) => `<div><span class="font-medium">${esc(r.user_full_name) || '—'}</span><br><span class="text-xs text-muted">${r.user_username ? '@'+esc(r.user_username) : 'ID: '+r.user_id}</span></div>` },
     { key: 'plan_name', label: 'Тариф', sortable: true, render: (r) => `<span class="text-xs">${esc(r.plan_name) || '—'}</span>` },
     { key: 'expires_at', label: 'Истекает', sortable: true, render: (r) => r.expires_at ? `<span class="text-xs text-muted">${formatDate(r.expires_at)}</span>` : '<span class="text-xs text-muted">—</span>' },
+    { key: 'remnawave', label: 'Remnawave', sortable: false, render: (r) => r.remnawave_key_id ? `<code class="font-mono text-[10px] text-accent">${r.remnawave_key_id}</code>` : '<span class="text-xs text-muted">—</span>' },
   ];
 </script>
 
@@ -193,14 +252,29 @@
 
   <Table columns={columns} data={filteredSubscriptions}>
     {#snippet actions(row)}
-      <span class="badge {statusBadge(row.status)}">{statusText(row.status)}</span>
+      <span class="badge {statusBadge(row.status)} text-[10px]">{statusText(row.status)}</span>
       {#if row.status !== 'active'}
-        <button class="btn btn-ghost text-success hover:text-success-hover" onclick={() => handleActivate(row.id)} title="Активировать"><Icon name="play" class="w-3.5 h-3.5" /></button>
+        <button class="btn btn-ghost btn-xs text-success hover:text-success-hover" onclick={() => handleActivate(row.id)} title="Активировать">
+          <Icon name="play" class="w-3 h-3" />
+        </button>
       {/if}
-      {#if row.status === 'active'}
-        <button class="btn btn-ghost text-warning hover:text-warning-hover" onclick={() => askDeactivate(row)} title="Деактивировать"><Icon name="pause" class="w-3.5 h-3.5" /></button>
+      {#if row.status === 'active' && row.remnawave_key_id}
+        <button class="btn btn-ghost btn-xs text-warning hover:text-warning-hover" onclick={() => askExtend(row)} title="Продлить">
+          <Icon name="clock" class="w-3 h-3" />
+        </button>
+        <button class="btn btn-ghost btn-xs text-accent hover:text-accent" onclick={() => askResetTraffic(row)} title="Сбросить трафик">
+          <Icon name="refreshCw" class="w-3 h-3" />
+        </button>
+        <button class="btn btn-ghost btn-xs text-warning hover:text-warning-hover" onclick={() => askDeactivate(row)} title="Отключить (локально)">
+          <Icon name="pause" class="w-3 h-3" />
+        </button>
+        <button class="btn btn-ghost btn-xs text-danger hover:text-danger-hover" onclick={() => askRevokePanel(row)} title="Отозвать в Remnawave">
+          <Icon name="shieldOff" class="w-3 h-3" />
+        </button>
       {/if}
-      <button class="btn btn-ghost text-danger hover:text-danger-hover" onclick={() => askDelete(row)} title="Удалить"><Icon name="trash-2" class="w-3.5 h-3.5" /></button>
+      <button class="btn btn-ghost btn-xs text-danger hover:text-danger-hover" onclick={() => askDelete(row)} title="Удалить">
+        <Icon name="trash-2" class="w-3 h-3" />
+      </button>
     {/snippet}
   </Table>
   {#if total > limit}
@@ -272,3 +346,33 @@
   onConfirm={handleDeactivate}
   onCancel={() => { confirmDeactivate = false; deactivateTarget = null; }}
 />
+
+<ConfirmDialog
+  bind:show={confirmRevokePanel}
+  title="Отозвать в Remnawave?"
+  message={`Отозвать подписку ${revokePanelTarget?.remnawave_key_id} в панели Remnawave? Пользователь будет отключен от VPN на панели.`}
+  confirmText="Отозвать"
+  danger
+  onConfirm={handleRevokePanel}
+  onCancel={() => { confirmRevokePanel = false; revokePanelTarget = null; }}
+/>
+
+<ConfirmDialog
+  bind:show={confirmResetTraffic}
+  title="Сбросить трафик?"
+  message={`Сбросить счётчик трафика для ${resetTrafficTarget?.remnawave_key_id}?`}
+  confirmText="Сбросить"
+  onConfirm={handleResetTraffic}
+  onCancel={() => { confirmResetTraffic = false; resetTrafficTarget = null; }}
+/>
+
+<ConfirmDialog
+  bind:show={confirmExtend}
+  title="Продлить подписку?"
+  message={`Продлить ${extendTarget?.remnawave_key_id} на дней:`}
+  confirmText="Продлить"
+  onConfirm={handleExtend}
+  onCancel={() => { confirmExtend = false; extendTarget = null; }}
+>
+  <input type="number" bind:value={extendDays} class="input w-full mt-3" min="1" placeholder="30" />
+</ConfirmDialog>

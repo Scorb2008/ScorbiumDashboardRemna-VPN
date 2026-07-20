@@ -560,6 +560,11 @@ class VpnKeyService:
         if not key:
             return None
         key.status = VpnKeyStatus.ACTIVE.value
+        if key.remnawave_key_id:
+            try:
+                await self._get_panel().enable_user(key.remnawave_key_id)
+            except Exception as e:
+                log.warning(f"Failed to enable in panel: {e}")
         await self.session.flush()
         return key
 

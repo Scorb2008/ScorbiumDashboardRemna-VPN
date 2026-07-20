@@ -11,9 +11,13 @@
   let stats = $state(null);
   let nodes = $state([]);
   let remnawaveUsers = $state([]);
+  let squads = $state([]);
   let loading = $state(true);
   let activeTab = $state('nodes');
   let connectionError = $state('');
+  let actionLoading = $state({});
+  let confirmAction = $state(null);
+  let actionTarget = $state(null);
 
   let proxyMethod = $state('GET');
   let proxyPath = $state('api/system/stats');
@@ -36,18 +40,20 @@
       const connectData = await api.getRemnawaveConnect();
       baseUrl = connectData.base_url || '';
 
-      const [s, n, u] = await Promise.all([
+      const [s, n, u, sq] = await Promise.all([
         api.getRemnawaveStats().catch(() => ({ connected: false })),
         api.getRemnawaveNodes().catch(() => ({ nodes: [] })),
         remnawaveProxy('GET', 'api/users?start=0&size=200')
           .then(d => d?.users || d?.response?.users || [])
           .catch(() => []),
+        api.getRemnawaveSquads().catch(() => ({ squads: [] })),
       ]);
 
       connected = s.connected !== false;
       stats = s;
       nodes = n.nodes || [];
       remnawaveUsers = u;
+      squads = sq.squads || [];
       connectionError = s.error || '';
     } catch (e) {
       toasts.error('Ошибка подключения к Remnawave: ' + e.message);
@@ -59,6 +65,20 @@
   }
 
   onMount(loadAll);
+
+  async function doUserAction(action, username) {
+    actionLoading = { ...actionLoading, [`${action}:${username}`]: true };
+    try {
+      if (action === 'revoke') await api.remnawaveRevoke(username);
+      else if (action === 'enable') await api.remnawaveEnable(username);
+      else if (action === 'disable') await api.remnawaveDisable(username);
+      else if (action === 'reset-traffic') await api.remnawaveResetTraffic(username);
+      else if (action === 'delete') await api.remnawaveDelete(username);
+      toasts.success(`${action} выполнен для ${username}`);
+      await loadAll();
+    } catch (e) { toasts.error(e.message); }
+    finally { actionLoading = { ...actionLoading, [`${action}:${username}`]: false }; }
+  }
 
   async function callDirect() {
     if (!proxyPath.trim()) return;
@@ -210,6 +230,7 @@
         { id: 'nodes', label: 'Узлы', icon: 'server' },
         { id: 'load', label: 'Загрузка', icon: 'activity' },
         { id: 'users', label: 'Пользователи', icon: 'users' },
+        { id: 'squads', label: 'Скуады', icon: 'shield' },
         { id: 'api', label: 'API', icon: 'terminal' },
       ] as tab}
         <button
@@ -364,12 +385,89 @@
 
     {:else if activeTab === 'users'}
       {#if remnawaveUsers.length > 0}
-        <Table columns={userColumns} data={remnawaveUsers} />
+        <div class="space-y-2">
+          {#each remnawaveUsers as user}
+            {@const username = user.username || user.shortUuid || '—'}
+            {@const isActive = user.status === 'ACTIVE' || user.status === 'active'}
+            <div class="card p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2">
+                  <code class="font-mono text-xs text-accent">{username}</code>
+                  <span class="badge {isActive ? 'badge-success' : 'badge-danger'} text-[10px]">{user.status || 'unknown'}</span>
+                </div>
+                <div class="flex gap-4 mt-1 text-[11px] text-muted">
+                  <span>Трафик: {formatBytes(user.usedTrafficBytes ?? 0)}{user.dataLimitBytes ? ' / ' + formatBytes(user.dataLimitBytes) : ''}</span>
+                  {#if user.expireAt}
+                    <span>Истекает: {new Date(user.expireAt).toLocaleDateString('ru-RU')}</span>
+                  {/if}
+                </div>
+              </div>
+              <div class="flex gap-1.5 shrink-0 flex-wrap">
+                {#if isActive}
+                  <button class="btn btn-ghost btn-xs text-warning" onclick={() => doUserAction('disable', username)}
+                    disabled={actionLoading[`disable:${username}`]} title="Отключить">
+                    <Icon name="pause" class="w-3 h-3" /> Откл.
+                  </button>
+                  <button class="btn btn-ghost btn-xs text-accent" onclick={() => doUserAction('reset-traffic', username)}
+                    disabled={actionLoading[`reset-traffic:${username}`]} title="Сбросить трафик">
+                    <Icon name="refreshCw" class="w-3 h-3" />
+                  </button>
+                  <button class="btn btn-ghost btn-xs text-danger" onclick={() => doUserAction('revoke', username)}
+                    disabled={actionLoading[`revoke:${username}`]} title="Отозвать подписку">
+                    <Icon name="shieldOff" class="w-3 h-3" /> Отозвать
+                  </button>
+                {:else}
+                  <button class="btn btn-ghost btn-xs text-success" onclick={() => doUserAction('enable', username)}
+                    disabled={actionLoading[`enable:${username}`]} title="Включить">
+                    <Icon name="play" class="w-3 h-3" /> Вкл.
+                  </button>
+                {/if}
+                <button class="btn btn-ghost btn-xs text-danger" onclick={() => doUserAction('delete', username)}
+                  disabled={actionLoading[`delete:${username}`]} title="Удалить">
+                  <Icon name="trash-2" class="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+          {/each}
+        </div>
       {:else}
         <div class="card p-10 flex flex-col items-center gap-3 text-center">
           <Icon name="users" class="w-10 h-10 text-muted" />
           <p class="text-[15px] font-medium">Нет данных о пользователях</p>
           <p class="text-[13px] text-muted">Пользователи Remnawave не найдены</p>
+          <button class="btn btn-secondary mt-2" onclick={loadAll}>Обновить</button>
+        </div>
+      {/if}
+
+    {:else if activeTab === 'squads'}
+      {#if squads.length > 0}
+        <div class="space-y-2">
+          {#each squads as squad}
+            <div class="card p-4 flex items-center justify-between gap-4">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-[10px] bg-accent/10 flex items-center justify-center">
+                  <Icon name="shield" class="w-5 h-5 text-accent" />
+                </div>
+                <div>
+                  <p class="text-[14px] font-semibold">{squad.name}</p>
+                  <p class="text-[11px] text-muted">{squad.inbound_tags?.join(', ') || '—'}</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-3">
+                <div class="text-right">
+                  <p class="text-lg font-bold">{squad.total_users || 0}</p>
+                  <p class="text-[10px] text-muted">юзеров</p>
+                </div>
+                <span class="badge {squad.is_disabled ? 'badge-danger' : 'badge-success'} text-[10px]">{squad.is_disabled ? 'Откл.' : 'Активен'}</span>
+              </div>
+            </div>
+          {/each}
+        </div>
+      {:else}
+        <div class="card p-10 flex flex-col items-center gap-3 text-center">
+          <Icon name="shield" class="w-10 h-10 text-muted" />
+          <p class="text-[15px] font-medium">Нет данных о скуадах</p>
+          <p class="text-[13px] text-muted">Скуады Remnawave не найдены</p>
           <button class="btn btn-secondary mt-2" onclick={loadAll}>Обновить</button>
         </div>
       {/if}

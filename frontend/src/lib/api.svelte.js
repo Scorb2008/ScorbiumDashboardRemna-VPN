@@ -174,6 +174,13 @@ class ApiClient {
   getRemnawaveConnect() { return this.get('/remnawave/connect'); }
   getRemnawaveNodes() { return this.get('/remnawave/nodes'); }
   getRemnawaveStats() { return this.get('/remnawave/stats'); }
+  getRemnawaveSquads() { return this.get('/remnawave/squads'); }
+  remnawaveRevoke(username) { return this.post(`/remnawave/users/${username}/revoke`); }
+  remnawaveEnable(username) { return this.post(`/remnawave/users/${username}/enable`); }
+  remnawaveDisable(username) { return this.post(`/remnawave/users/${username}/disable`); }
+  remnawaveResetTraffic(username) { return this.post(`/remnawave/users/${username}/reset-traffic`); }
+  remnawaveDelete(username) { return this.request('DELETE', `/remnawave/users/${username}`); }
+  remnawaveExtend(username, days) { return this.post(`/remnawave/users/${username}/extend?days=${days}`); }
 
   // Admins
   getAdmins() { return this.get('/admins/'); }

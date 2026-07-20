@@ -86,6 +86,83 @@ async def remnawave_stats(_admin=Depends(get_current_admin)):
         return {"connected": False, "error": str(e)}
 
 
+@router.get("/squads")
+async def remnawave_squads(_admin=Depends(get_current_admin)):
+    """Return list of Remnawave internal squads."""
+    svc = RemnawaveService()
+    try:
+        squads = await svc.get_groups()
+        return {"squads": squads, "total": len(squads)}
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Remnawave error: {str(e)}")
+
+
+@router.post("/users/{username}/revoke")
+async def remnawave_revoke_user(username: str, _admin=Depends(get_current_admin)):
+    """Revoke a user subscription in Remnawave."""
+    svc = RemnawaveService()
+    try:
+        await svc.revoke_user_subscription(username)
+        return {"ok": True, "message": f"Subscription revoked for {username}"}
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+
+@router.post("/users/{username}/enable")
+async def remnawave_enable_user(username: str, _admin=Depends(get_current_admin)):
+    """Enable a disabled user in Remnawave."""
+    svc = RemnawaveService()
+    try:
+        await svc.enable_user(username)
+        return {"ok": True, "message": f"User {username} enabled"}
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+
+@router.post("/users/{username}/disable")
+async def remnawave_disable_user(username: str, _admin=Depends(get_current_admin)):
+    """Disable a user in Remnawave."""
+    svc = RemnawaveService()
+    try:
+        await svc.disable_user(username)
+        return {"ok": True, "message": f"User {username} disabled"}
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+
+@router.post("/users/{username}/reset-traffic")
+async def remnawave_reset_traffic(username: str, _admin=Depends(get_current_admin)):
+    """Reset traffic counters for a user in Remnawave."""
+    svc = RemnawaveService()
+    try:
+        await svc.reset_user_traffic(username)
+        return {"ok": True, "message": f"Traffic reset for {username}"}
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+
+@router.delete("/users/{username}")
+async def remnawave_delete_user(username: str, _admin=Depends(get_current_admin)):
+    """Permanently delete a user from Remnawave."""
+    svc = RemnawaveService()
+    try:
+        await svc.delete_user(username)
+        return {"ok": True, "message": f"User {username} deleted"}
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+
+@router.post("/users/{username}/extend")
+async def remnawave_extend_user(username: str, days: int = 30, _admin=Depends(get_current_admin)):
+    """Extend a user subscription in Remnawave."""
+    svc = RemnawaveService()
+    try:
+        await svc.extend_user(username, days)
+        return {"ok": True, "message": f"User {username} extended by {days} days"}
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+
 @router.api_route(
     "/proxy/{path:path}",
     methods=["GET", "POST", "PUT", "PATCH", "DELETE"],

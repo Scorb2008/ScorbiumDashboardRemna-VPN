@@ -1,7 +1,7 @@
 <script>
   import Icon from './Icon.svelte';
 
-  let { show = $bindable(false), onConfirm = () => {}, onCancel = () => {}, title = 'Подтверждение', message = '', confirmText = 'Удалить', danger = true } = $props();
+  let { show = $bindable(false), onConfirm = () => {}, onCancel = () => {}, title = 'Подтверждение', message = '', confirmText = 'Удалить', danger = true, children = null } = $props();
 </script>
 
 {#if show}
@@ -16,6 +16,9 @@
       </div>
       <h3 id="confirm-dialog-title" class="text-[15px] font-semibold text-center mb-1.5">{title}</h3>
       <p class="text-[13px] text-muted text-center mb-6 leading-relaxed">{message}</p>
+      {#if children}
+        <div class="mb-4">{@render children()}</div>
+      {/if}
       <div class="flex gap-3 justify-center">
         <button class="btn btn-secondary" onclick={onCancel}>Отмена</button>
         <button class="btn {danger ? 'btn-danger' : 'btn-primary'}" onclick={onConfirm}>{confirmText}</button>
