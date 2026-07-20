@@ -226,11 +226,11 @@
   }
 
   const columns = [
-    { key: 'id', label: 'ID', sortable: true, render: (r) => `<span class="font-mono text-xs text-zinc-500">#${r.id}</span>` },
-    { key: 'user_id', label: 'Пользователь', sortable: true, render: (r) => `<div><span class="font-medium">${esc(r.user_full_name) || '—'}</span><br><span class="text-xs text-muted">${r.user_username ? '@'+esc(r.user_username) : 'ID: '+r.user_id}</span></div>` },
-    { key: 'plan_name', label: 'Тариф', sortable: true, render: (r) => `<span class="text-xs">${esc(r.plan_name) || '—'}</span>` },
-    { key: 'expires_at', label: 'Истекает', sortable: true, render: (r) => r.expires_at ? `<span class="text-xs text-muted">${formatDate(r.expires_at)}</span>` : '<span class="text-xs text-muted">—</span>' },
-    { key: 'remnawave', label: 'Remnawave', sortable: false, render: (r) => r.remnawave_key_id ? `<code class="font-mono text-[10px] text-accent">${r.remnawave_key_id}</code>` : '<span class="text-xs text-muted">—</span>' },
+    { key: 'id', label: 'ID', sortable: true, render: (r) => `<span class="font-mono text-[11px] text-zinc-500">#${r.id}</span>` },
+    { key: 'user_id', label: 'Пользователь', sortable: true, render: (r) => `<div class="leading-tight"><span class="font-medium text-[12px]">${esc(r.user_full_name) || '—'}</span> <span class="text-[11px] text-muted">${r.user_username ? '@'+esc(r.user_username) : 'ID: '+r.user_id}</span></div>` },
+    { key: 'plan_name', label: 'Тариф', sortable: true, render: (r) => `<span class="text-[12px]">${esc(r.plan_name) || '—'}</span>` },
+    { key: 'expires_at', label: 'Истекает', sortable: true, render: (r) => r.expires_at ? `<span class="text-[11px] text-muted">${formatDate(r.expires_at)}</span>` : '<span class="text-[11px] text-muted">—</span>' },
+    { key: 'remnawave', label: 'Remnawave', sortable: false, render: (r) => r.remnawave_key_id ? `<code class="font-mono text-[10px] text-accent">${r.remnawave_key_id}</code>` : '<span class="text-[11px] text-muted">—</span>' },
   ];
 </script>
 

@@ -6,9 +6,9 @@ body {
   margin: 0;
   background-color: #0d0d12;
   background-image:
-    linear-gradient(rgba(91, 141, 239, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(91, 141, 239, 0.03) 1px, transparent 1px);
-  background-size: 40px 40px;
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 48px 48px;
   color: #f0f0f2;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
