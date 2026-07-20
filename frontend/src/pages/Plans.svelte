@@ -70,11 +70,11 @@
   }
 
   const columns = [
-    { key: 'id', label: 'ID', sortable: true },
-    { key: 'name', label: 'Название', sortable: true, render: (r) => `<span class="font-medium">${r.name}</span>` },
-    { key: 'price', label: 'Цена', sortable: true, render: (r) => `<span class="font-mono text-xs">${formatPrice(r.price)}</span>` },
+    { key: 'id', label: 'ID', sortable: true, render: (r) => `<span class="text-[11px] text-muted">${r.id}</span>` },
+    { key: 'name', label: 'Название', sortable: true, render: (r) => `<span class="font-medium text-[12px]">${r.name}</span>` },
     { key: 'duration_days', label: 'Дней', sortable: true },
-    { key: 'traffic_gb', label: 'Трафик', sortable: true, render: (r) => r.traffic_gb ? `${r.traffic_gb} ГБ` : '∞' },
+    { key: 'price', label: 'Цена', sortable: true, render: (r) => `<span class="font-mono text-[11px]">${formatPrice(r.price)}</span>` },
+    { key: 'traffic_gb', label: 'Трафик', sortable: true, render: (r) => `<span class="text-[11px]">${r.traffic_gb ? r.traffic_gb + ' ГБ' : '∞'}</span>` },
     { key: 'device_limit', label: 'Устр.', sortable: true },
   ];
 </script>
@@ -93,9 +93,9 @@
 
   <Table columns={columns} data={filteredPlans}>
     {#snippet actions(row)}
-      <span class="badge {row.is_active !== false ? 'badge-success' : 'badge-danger'}">{row.is_active !== false ? 'Активен' : 'Неактивен'}</span>
-      <button class="btn btn-ghost text-muted hover:text-zinc-300" onclick={() => openEdit(row)}><Icon name="pencil" class="w-3.5 h-3.5" /></button>
-      <button class="btn btn-ghost text-danger hover:text-danger-hover" onclick={() => askDelete(row)}><Icon name="trash-2" class="w-3.5 h-3.5" /></button>
+      <span class="badge text-[10px] {row.is_active !== false ? 'badge-success' : 'badge-danger'}">{row.is_active !== false ? 'Активен' : 'Неактивен'}</span>
+      <button class="btn btn-ghost btn-xs text-muted hover:text-zinc-300" onclick={() => openEdit(row)}><Icon name="pencil" class="w-3 h-3" /></button>
+      <button class="btn btn-ghost btn-xs text-danger hover:text-danger-hover" onclick={() => askDelete(row)}><Icon name="trash-2" class="w-3 h-3" /></button>
     {/snippet}
   </Table>
 </div>
