@@ -26,7 +26,7 @@
       : plans
   );
 
-  let form = $state({ name: '', description: '', price: 0, duration_days: 30, traffic_gb: 0, device_limit: 3, is_active: true, is_trial: false });
+  let form = $state({ name: '', description: '', price: 0, duration_days: 30, is_active: true });
 
   async function loadPlans() {
     loading = true;
@@ -39,24 +39,29 @@
 
   function openCreate() {
     editPlan = null;
-    form = { name: '', description: '', price: 0, duration_days: 30, traffic_gb: 0, device_limit: 3, is_active: true, is_trial: false };
+    form = { name: '', description: '', price: 0, duration_days: 30, is_active: true };
     showModal = true;
   }
   function openEdit(plan) {
     editPlan = plan;
-    form = { name: plan.name || '', description: plan.description || '', price: plan.price || 0, duration_days: plan.duration_days || 30, traffic_gb: plan.traffic_gb || 0, device_limit: plan.device_limit || 3, is_active: plan.is_active !== false, is_trial: plan.is_trial || false };
+    form = { name: plan.name || '', description: plan.description || '', price: plan.price || 0, duration_days: plan.duration_days || 30, is_active: plan.is_active !== false };
     showModal = true;
   }
 
   async function savePlan() {
     if (!form.name?.trim()) return toasts.error('Введите название тарифа');
     if (form.price < 0) return toasts.error('Цена не может быть отрицательной');
-    if (form.duration_days < 1) return toasts.error('Дней должно быть не менее 1');
-    if (form.device_limit < 1) return toasts.error('Устройств должно быть не менее 1');
-    if (form.traffic_gb < 0) return toasts.error('Трафик не может быть отрицательным');
+    if (form.duration_days < 1) return tosts.error('Дней должно быть не менее 1');
     try {
-      if (editPlan) { await api.updatePlan(editPlan.id, form); toasts.success('Тариф обновлён'); }
-      else { await api.createPlan(form); toasts.success('Тариф создан'); }
+      if (editPlan) {
+        await api.updatePlan(editPlan.id, form);
+        toasts.success('Тариф обновлён');
+      } else {
+        const translit = { 'а':'a','б':'b','в':'v','г':'g','д':'d','е':'e','ё':'yo','ж':'zh','з':'z','и':'i','й':'y','к':'k','л':'l','м':'m','н':'n','о':'o','п':'p','р':'r','с':'s','т':'t','у':'u','ф':'f','х':'kh','ц':'ts','ч':'ch','ш':'sh','щ':'shch','ъ':'','ы':'y','ь':'','э':'e','ю':'yu','я':'ya' };
+        const slug = form.name.toLowerCase().replace(/[а-яё]/g, c => translit[c] || '').replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 64) || ('plan_' + Date.now());
+        await api.createPlan({ ...form, slug });
+        toasts.success('Тариф создан');
+      }
       showModal = false; await loadPlans();
     } catch (e) { toasts.error(e.message); }
   }
@@ -72,10 +77,10 @@
   const columns = [
     { key: 'id', label: 'ID', sortable: true, render: (r) => `<span class="text-[11px] text-muted">${r.id}</span>` },
     { key: 'name', label: 'Название', sortable: true, render: (r) => `<span class="font-medium text-[12px]">${r.name}</span>` },
+    { key: 'slug', label: 'Slug', sortable: true, render: (r) => `<span class="font-mono text-[11px] text-muted">${r.slug}</span>` },
     { key: 'duration_days', label: 'Дней', sortable: true },
     { key: 'price', label: 'Цена', sortable: true, render: (r) => `<span class="font-mono text-[11px]">${formatPrice(r.price)}</span>` },
-    { key: 'traffic_gb', label: 'Трафик', sortable: true, render: (r) => `<span class="text-[11px]">${r.traffic_gb ? r.traffic_gb + ' ГБ' : '∞'}</span>` },
-    { key: 'device_limit', label: 'Устр.', sortable: true },
+    { key: 'currency', label: 'Валюта', sortable: false },
   ];
 </script>
 
@@ -119,23 +124,11 @@
         <label class="label"><span class="label-text">Дней</span></label>
         <input type="number" bind:value={form.duration_days} class="input w-full" min="1" required />
       </div>
-      <div class="space-y-1">
-        <label class="label"><span class="label-text">Трафик (ГБ, 0=∞)</span></label>
-        <input type="number" bind:value={form.traffic_gb} class="input w-full" min="0" />
-      </div>
-      <div class="space-y-1">
-        <label class="label"><span class="label-text">Устройства</span></label>
-        <input type="number" bind:value={form.device_limit} class="input w-full" min="1" />
-      </div>
     </div>
-    <div class="flex items-center gap-3">
+    <div>
       <label class="flex items-center gap-2 cursor-pointer">
         <input type="checkbox" bind:checked={form.is_active} class="w-4 h-4 rounded accent-accent" />
         <span class="text-sm">Активен</span>
-      </label>
-      <label class="flex items-center gap-2 cursor-pointer">
-        <input type="checkbox" bind:checked={form.is_trial} class="w-4 h-4 rounded accent-accent" />
-        <span class="text-sm">Пробный</span>
       </label>
     </div>
     <div class="flex gap-3 pt-2">
