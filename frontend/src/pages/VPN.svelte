@@ -12,6 +12,9 @@
   let subscriptions = $state([]);
   let loading = $state(true);
   let search = $state('');
+  let offset = $state(0);
+  let limit = $state(100);
+  let total = $state(0);
 
   let showGiveModal = $state(false);
   let plans = $state([]);
@@ -30,7 +33,11 @@
 
   async function loadSubscriptions() {
     loading = true;
-    try { subscriptions = await api.getSubscriptions({ limit: 500 }); }
+    try {
+      const res = await api.getSubscriptions({ limit, offset });
+      subscriptions = res.items || [];
+      total = res.total || 0;
+    }
     catch (e) { toasts.error('Ошибка загрузки подписок: ' + e.message); }
     finally { loading = false; }
   }
@@ -196,6 +203,15 @@
       <button class="btn btn-ghost text-danger hover:text-danger-hover" onclick={() => askDelete(row)} title="Удалить"><Icon name="trash-2" class="w-3.5 h-3.5" /></button>
     {/snippet}
   </Table>
+  {#if total > limit}
+    <div class="flex items-center justify-between text-sm text-muted">
+      <span>Показано {offset + 1}–{Math.min(offset + limit, total)} из {total}</span>
+      <div class="flex gap-2">
+        <button class="btn btn-secondary text-xs" onclick={() => { offset = Math.max(0, offset - limit); loadSubscriptions(); }} disabled={offset === 0}>← Назад</button>
+        <button class="btn btn-secondary text-xs" onclick={() => { if (offset + limit < total) { offset += limit; loadSubscriptions(); } }} disabled={offset + limit >= total}>Далее →</button>
+      </div>
+    </div>
+  {/if}
 </div>
 
 <Modal bind:open={showGiveModal} title="Выдать подписку" size="md">

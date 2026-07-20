@@ -16,7 +16,6 @@
     try {
       await api.login(username, password);
       window.location.hash = '#/dashboard';
-      window.location.reload();
     } catch (err) {
       error = err.message || 'Ошибка авторизации';
     } finally {

@@ -1,3 +1,4 @@
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from decimal import Decimal, InvalidOperation
@@ -244,18 +245,23 @@ async def _finalize_subscription_payment(
     return payment, delivery.key, confirmation.just_confirmed, delivery.just_processed
 
 
-@router.get("/", response_model=list[PaymentRead], summary="List payments")
+@router.get("/", summary="List payments")
 async def list_payments(
     limit: int = 100,
     offset: int = 0,
     status: Optional[PaymentStatus] = None,
     user_id: Optional[int] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     _: str = Depends(get_current_admin),
-) -> list[PaymentRead]:
-    return await PaymentService(db).get_all(
-        limit=limit, offset=offset, status=status, user_id=user_id
-    )
+):
+    svc = PaymentService(db)
+    parsed_from = datetime.fromisoformat(date_from) if date_from else None
+    parsed_to = datetime.fromisoformat(date_to) if date_to else None
+    items = await svc.get_all(limit=limit, offset=offset, status=status, user_id=user_id, date_from=parsed_from, date_to=parsed_to)
+    total = await svc.count(status=status, user_id=user_id, date_from=parsed_from, date_to=parsed_to)
+    return {"items": items, "total": total, "limit": limit, "offset": offset}
 
 
 @router.get("/{payment_id}", response_model=PaymentRead, summary="Get payment")

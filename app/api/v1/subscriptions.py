@@ -9,15 +9,18 @@ router = APIRouter()
 
 
 @router.get(
-    "/", response_model=list[VpnKeyRead], summary="List all VPN keys (subscriptions)"
+    "/", summary="List all VPN keys (subscriptions)"
 )
 async def list_subscriptions(
     limit: int = 100,
     offset: int = 0,
     db: AsyncSession = Depends(get_db),
     _: str = Depends(get_current_admin),
-) -> list[VpnKeyRead]:
-    return await VpnKeyService(db).get_all(limit=limit, offset=offset)
+):
+    svc = VpnKeyService(db)
+    items = await svc.get_all(limit=limit, offset=offset)
+    total = await svc.count()
+    return {"items": items, "total": total, "limit": limit, "offset": offset}
 
 
 @router.get("/{key_id}", response_model=VpnKeyRead, summary="Get VPN key")

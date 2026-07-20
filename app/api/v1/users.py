@@ -99,8 +99,11 @@ async def list_users(
     offset: int = 0,
     db: AsyncSession = Depends(get_db),
     _: str = Depends(get_current_admin),
-) -> list[UserRead]:
-    return await UserService(db).get_all(limit=limit, offset=offset)
+):
+    svc = UserService(db)
+    items = await svc.get_all(limit=limit, offset=offset)
+    total = await svc.count_all()
+    return {"items": [UserRead.model_validate(u).model_dump() for u in items], "total": total, "limit": limit, "offset": offset}
 
 
 @router.get("/{user_id}/keys", response_model=list[VpnKeyRead], summary="User VPN keys")

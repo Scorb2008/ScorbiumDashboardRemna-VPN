@@ -1,3 +1,4 @@
+from datetime import datetime
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.dependencies import get_db, require_role
@@ -13,11 +14,24 @@ async def list_audit_logs(
     offset: int = Query(0, ge=0),
     action: str | None = None,
     admin_id: int | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
     _admin=Depends(require_role("superadmin")),
     db: AsyncSession = Depends(get_db),
 ):
     svc = AuditService(db)
-    entries, total = await svc.get_paginated(limit=limit, offset=offset, action=action, admin_id=admin_id)
+
+    parsed_from = None
+    parsed_to = None
+    if date_from:
+        parsed_from = datetime.fromisoformat(date_from)
+    if date_to:
+        parsed_to = datetime.fromisoformat(date_to)
+
+    entries, total = await svc.get_paginated(
+        limit=limit, offset=offset, action=action, admin_id=admin_id,
+        date_from=parsed_from, date_to=parsed_to,
+    )
 
     admin_ids = list({e.admin_id for e in entries})
     admins_map: dict[int, dict] = {}

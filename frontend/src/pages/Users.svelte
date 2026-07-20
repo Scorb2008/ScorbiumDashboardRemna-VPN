@@ -12,6 +12,9 @@
   let users = $state([]);
   let loading = $state(true);
   let search = $state('');
+  let offset = $state(0);
+  let limit = $state(50);
+  let total = $state(0);
 
   let selectedUser = $state(null);
   let showModal = $state(false);
@@ -47,7 +50,11 @@
 
   async function loadUsers() {
     loading = true;
-    try { users = await api.getUsers({ limit: 500 }); }
+    try {
+      const res = await api.getUsers({ limit, offset });
+      users = res.items || [];
+      total = res.total || 0;
+    }
     catch (e) { toasts.error('Ошибка загрузки: ' + e.message); }
     finally { loading = false; }
   }
@@ -287,6 +294,10 @@
           <Icon name="chevronDown" size={14} />
         {/if}
       </button>
+      <a href="/api/v1/database/export/users" class="btn btn-sm btn-secondary" target="_blank">
+        <Icon name="download" size={16} />
+        CSV
+      </a>
       <input type="text" bind:value={search} placeholder="Поиск по ID, username, имени..." class="input w-full sm:w-80" />
     </div>
   </div>
@@ -433,6 +444,15 @@
         </span>
       {/snippet}
     </Table>
+    {#if total > limit}
+      <div class="flex items-center justify-between text-sm text-muted px-1">
+        <span>Показано {offset + 1}–{Math.min(offset + limit, total)} из {total}</span>
+        <div class="flex gap-2">
+          <button class="btn btn-secondary text-xs" onclick={() => { offset = Math.max(0, offset - limit); loadUsers(); }} disabled={offset === 0}>← Назад</button>
+          <button class="btn btn-secondary text-xs" onclick={() => { if (offset + limit < total) { offset += limit; loadUsers(); } }} disabled={offset + limit >= total}>Далее →</button>
+        </div>
+      </div>
+    {/if}
   {/if}
 </div>
 

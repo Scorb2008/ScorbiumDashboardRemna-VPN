@@ -1,3 +1,4 @@
+from datetime import datetime
 from decimal import Decimal
 from dataclasses import dataclass
 from typing import Optional
@@ -43,6 +44,8 @@ class PaymentService:
         status: Optional[PaymentStatus] = None,
         user_id: Optional[int] = None,
         payment_type: Optional[PaymentType] = None,
+        date_from: Optional[datetime] = None,
+        date_to: Optional[datetime] = None,
     ) -> list[Payment]:
         q = (
             select(Payment)
@@ -56,8 +59,34 @@ class PaymentService:
             q = q.where(Payment.user_id == user_id)
         if payment_type:
             q = q.where(Payment.payment_type == payment_type.value)
+        if date_from:
+            q = q.where(Payment.created_at >= date_from)
+        if date_to:
+            q = q.where(Payment.created_at <= date_to)
         result = await self.session.execute(q)
         return list(result.scalars().all())
+
+    async def count(
+        self,
+        status: Optional[PaymentStatus] = None,
+        user_id: Optional[int] = None,
+        payment_type: Optional[PaymentType] = None,
+        date_from: Optional[datetime] = None,
+        date_to: Optional[datetime] = None,
+    ) -> int:
+        q = select(func.count()).select_from(Payment)
+        if status:
+            q = q.where(Payment.status == status.value)
+        if user_id:
+            q = q.where(Payment.user_id == user_id)
+        if payment_type:
+            q = q.where(Payment.payment_type == payment_type.value)
+        if date_from:
+            q = q.where(Payment.created_at >= date_from)
+        if date_to:
+            q = q.where(Payment.created_at <= date_to)
+        result = await self.session.execute(q)
+        return result.scalar_one()
 
     async def total_revenue(self) -> Decimal:
         """Выручка только от подписок (не считаем пополнения баланса)."""

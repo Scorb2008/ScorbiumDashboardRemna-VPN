@@ -13,12 +13,16 @@
   let limit = $state(50);
   let offset = $state(0);
   let actionFilter = $state('');
+  let dateFrom = $state('');
+  let dateTo = $state('');
 
   async function loadLogs() {
     loading = true;
     try {
       const params = { limit, offset };
       if (actionFilter) params.action = actionFilter;
+      if (dateFrom) params.date_from = dateFrom;
+      if (dateTo) params.date_to = dateTo;
       const res = await api.getAuditLogs(params);
       items = res.items || [];
       total = res.total || 0;
@@ -98,6 +102,8 @@
           <option value={key}>{label}</option>
         {/each}
       </select>
+      <input type="date" bind:value={dateFrom} class="input w-full sm:w-44" onchange={() => { offset = 0; loadLogs(); }} />
+      <input type="date" bind:value={dateTo} class="input w-full sm:w-44" onchange={() => { offset = 0; loadLogs(); }} />
     </div>
   </div>
 

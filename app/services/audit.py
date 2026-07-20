@@ -41,6 +41,8 @@ class AuditService:
         offset: int = 0,
         action: Optional[str] = None,
         admin_id: Optional[int] = None,
+        date_from: Optional[datetime] = None,
+        date_to: Optional[datetime] = None,
     ) -> tuple[list[AuditLog], int]:
         query = select(AuditLog)
         count_query = select(func.count()).select_from(AuditLog)
@@ -49,6 +51,10 @@ class AuditService:
             filters.append(AuditLog.action == action)
         if admin_id is not None:
             filters.append(AuditLog.admin_id == admin_id)
+        if date_from is not None:
+            filters.append(AuditLog.created_at >= date_from)
+        if date_to is not None:
+            filters.append(AuditLog.created_at <= date_to)
         if filters:
             from sqlalchemy import and_
             query = query.where(and_(*filters))

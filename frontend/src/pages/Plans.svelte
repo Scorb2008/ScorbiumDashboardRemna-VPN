@@ -15,6 +15,16 @@
   let editPlan = $state(null);
   let confirmDelete = $state(false);
   let deleteTarget = $state(null);
+  let search = $state('');
+
+  let filteredPlans = $derived(
+    search
+      ? plans.filter(p =>
+          p.name.toLowerCase().includes(search.toLowerCase()) ||
+          String(p.price).includes(search)
+        )
+      : plans
+  );
 
   let form = $state({ name: '', description: '', price: 0, duration_days: 30, traffic_gb: 0, device_limit: 3, is_active: true, is_trial: false });
 
@@ -78,9 +88,10 @@
       <p class="text-sm text-muted mt-1">{plans.length} тарифов</p>
     </div>
     <button class="btn btn-primary" onclick={openCreate}><Icon name="plus" class="w-4 h-4" /> Новый тариф</button>
+    <input type="text" bind:value={search} placeholder="Поиск..." class="input w-full sm:w-60" />
   </div>
 
-  <Table columns={columns} data={plans}>
+  <Table columns={columns} data={filteredPlans}>
     {#snippet actions(row)}
       <span class="badge {row.is_active !== false ? 'badge-success' : 'badge-danger'}">{row.is_active !== false ? 'Активен' : 'Неактивен'}</span>
       <button class="btn btn-ghost text-muted hover:text-zinc-300" onclick={() => openEdit(row)}><Icon name="pencil" class="w-3.5 h-3.5" /></button>

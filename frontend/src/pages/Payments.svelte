@@ -17,15 +17,34 @@
   let loading = $state(true);
   let search = $state('');
   let statusFilter = $state('all');
+  let dateFrom = $state('');
+  let dateTo = $state('');
+  let offset = $state(0);
+  let limit = $state(100);
+  let total = $state(0);
 
   async function loadPayments() {
     loading = true;
-    try { payments = await api.getPayments({ limit: 500 }); }
+    try {
+      const params = { limit, offset };
+      if (statusFilter !== 'all') params.status = statusFilter;
+      if (dateFrom) params.date_from = dateFrom;
+      if (dateTo) params.date_to = dateTo;
+      const res = await api.getPayments(params);
+      payments = res.items || [];
+      total = res.total || 0;
+    }
     catch (e) { toasts.error('Ошибка загрузки: ' + e.message); }
     finally { loading = false; }
   }
 
   onMount(loadPayments);
+
+  function changeStatus(e) {
+    statusFilter = e.target.value;
+    offset = 0;
+    loadPayments();
+  }
 
   let filteredPayments = $derived(
     payments.filter(p => {
@@ -66,6 +85,19 @@
     { key: 'payment_method', label: 'Способ', sortable: true, render: (r) => `<span class="text-xs">${formatPaymentMethod(r.payment_method)}</span>` },
     { key: 'plan_name', label: 'Тариф', sortable: true, render: (r) => `<span class="text-xs">${esc(r.plan_name) || '—'}</span>` },
   ];
+
+  let refunding = $state({});
+
+  async function handleRefund(id) {
+    if (!confirm('Вернуть платеж #' + id + '?')) return;
+    refunding = { ...refunding, [id]: true };
+    try {
+      await api.refundPayment(id);
+      toasts.success('Платеж #' + id + ' возвращён');
+      loadPayments();
+    } catch (e) { toasts.error(e.message); }
+    finally { refunding = { ...refunding, [id]: false }; }
+  }
 </script>
 
 <Spinner {loading} />
@@ -77,19 +109,37 @@
       <p class="text-sm text-muted mt-1">{filteredPayments.length} из {payments.length}</p>
     </div>
     <div class="flex gap-3 w-full sm:w-auto">
-      <select bind:value={statusFilter} class="select w-full sm:w-40">
+      <select bind:value={statusFilter} class="select w-full sm:w-40" onchange={() => { offset = 0; loadPayments(); }}>
         <option value="all">Все статусы</option>
         <option value="succeeded">Оплачен</option>
         <option value="pending">Ожидает</option>
         <option value="canceled">Отменён</option>
       </select>
+      <input type="date" bind:value={dateFrom} class="input w-full sm:w-40" onchange={() => { offset = 0; loadPayments(); }} />
+      <input type="date" bind:value={dateTo} class="input w-full sm:w-40" onchange={() => { offset = 0; loadPayments(); }} />
       <input type="text" bind:value={search} placeholder="Поиск..." class="input w-full sm:w-60" />
+      <a href="/api/v1/database/export/payments" class="btn btn-sm btn-secondary" target="_blank">
+        <Icon name="download" size={16} /> CSV
+      </a>
     </div>
   </div>
 
   <Table columns={columns} data={filteredPayments}>
     {#snippet actions(row)}
-      <span class="badge {statusBadge(row.status)}">{statusText(row.status)}</span>
+      {#if row.status === 'succeeded'}
+        <button class="btn btn-ghost btn-xs text-danger" onclick={() => handleRefund(row.id)} disabled={refunding[row.id]}>
+          {refunding[row.id] ? '...' : 'Вернуть'}
+        </button>
+      {/if}
     {/snippet}
   </Table>
+  {#if total > limit}
+    <div class="flex items-center justify-between text-sm text-muted">
+      <span>Показано {offset + 1}–{Math.min(offset + limit, total)} из {total}</span>
+      <div class="flex gap-2">
+        <button class="btn btn-secondary text-xs" onclick={() => { offset = Math.max(0, offset - limit); loadPayments(); }} disabled={offset === 0}>← Назад</button>
+        <button class="btn btn-secondary text-xs" onclick={() => { if (offset + limit < total) { offset += limit; loadPayments(); } }} disabled={offset + limit >= total}>Далее →</button>
+      </div>
+    </div>
+  {/if}
 </div>

@@ -110,8 +110,12 @@ class VpnKeyService:
 
     async def count_for_user(self, user_id: int) -> int:
         result = await self.session.execute(
-            select(func.count()).select_from(VpnKey).where(VpnKey.user_id == user_id)
+            select(func.count()).where(VpnKey.user_id == user_id).select_from(VpnKey)
         )
+        return result.scalar_one()
+
+    async def count(self) -> int:
+        result = await self.session.execute(select(func.count()).select_from(VpnKey))
         return result.scalar_one()
 
     async def refresh_traffic_for_keys(self, keys: list[VpnKey]) -> None:
