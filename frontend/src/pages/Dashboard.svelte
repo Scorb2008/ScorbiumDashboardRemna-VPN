@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { api } from '../lib/api.svelte.js';
   import { formatPrice } from '../lib/utils.js';
+  import { wsConnect, getWsState, onWsEvent } from '../lib/ws.svelte.js';
   import StatsCard from '../components/StatsCard.svelte';
   import Spinner from '../components/Spinner.svelte';
   import Icon from '../components/Icon.svelte';
@@ -10,6 +11,37 @@
   let loading = $state(true);
   let logoUrl = $state('');
   let error = $state(null);
+  let wsState = getWsState();
+  let liveEvents = $state([]);
+
+  const EVENT_ICONS = {
+    new_user: { icon: 'user-plus', color: 'text-success', bg: 'bg-success/10', label: 'Новый пользователь' },
+    new_payment: { icon: 'wallet', color: 'text-accent', bg: 'bg-accent/10', label: 'Новый платёж' },
+    expired_sub: { icon: 'alertTriangle', color: 'text-warning', bg: 'bg-warning/10', label: 'Истекла подписка' },
+    new_ticket: { icon: 'headset', color: 'text-warning', bg: 'bg-warning/10', label: 'Новый тикет' },
+  };
+
+  function formatEventText(event) {
+    const d = event.data || {};
+    switch (event.type) {
+      case 'new_user':
+        return `${d.full_name || d.username || 'Пользователь'} (${d.user_id})`;
+      case 'new_payment':
+        return `${formatPrice(d.amount || 0)} — user #${d.user_id || '?'}`;
+      case 'expired_sub':
+        return `${d.count || 0} подписок`;
+      case 'new_ticket':
+        return `${d.subject || 'Тикет'} — user #${d.user_id || '?'}`;
+      default:
+        return JSON.stringify(d);
+    }
+  }
+
+  function eventTime(ts) {
+    if (!ts) return '';
+    try { return new Date(ts).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' }); }
+    catch (_) { return ''; }
+  }
 
   onMount(async () => {
     try {
@@ -25,6 +57,12 @@
     } finally {
       loading = false;
     }
+
+    wsConnect();
+    const unsub = onWsEvent((event) => {
+      liveEvents = [event, ...liveEvents].slice(0, 20);
+    });
+    return unsub;
   });
 </script>
 
@@ -42,8 +80,8 @@
       </div>
     </div>
     <div class="flex items-center gap-2">
-      <div class="w-2 h-2 rounded-full bg-success animate-pulse-glow"></div>
-      <span class="text-xs text-muted">Система работает</span>
+      <div class="w-2 h-2 rounded-full {wsState.connected ? 'bg-success animate-pulse-glow' : 'bg-danger'}"></div>
+      <span class="text-xs text-muted">{wsState.connected ? 'Live' : 'Offline'}</span>
     </div>
   </div>
 
@@ -146,6 +184,30 @@
         </div>
       </div>
     </div>
+
+    {#if liveEvents.length > 0}
+      <div class="card p-5">
+        <div class="flex items-center gap-2 mb-3">
+          <div class="w-2 h-2 rounded-full bg-success animate-pulse-glow"></div>
+          <h3 class="text-[15px] font-semibold">Live-события</h3>
+          <span class="text-[11px] text-muted ml-auto">{liveEvents.length} событий</span>
+        </div>
+        <div class="space-y-0 divide-y divide-border max-h-64 overflow-y-auto">
+          {#each liveEvents as event, i}
+            {@const meta = EVENT_ICONS[event.type] || { icon: 'activity', color: 'text-muted', bg: 'bg-surface-3', label: event.type }}
+            <div class="flex items-center gap-3 py-2 {i === 0 ? 'animate-fade-in' : ''}">
+              <div class="w-7 h-7 rounded-[7px] {meta.bg} flex items-center justify-center flex-shrink-0">
+                <Icon name={meta.icon} class="w-3.5 h-3.5 {meta.color}" />
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-[13px] truncate">{meta.label}: {formatEventText(event)}</p>
+              </div>
+              <span class="text-[10px] text-muted shrink-0">{eventTime(event.ts)}</span>
+            </div>
+          {/each}
+        </div>
+      </div>
+    {/if}
 
     {#if stats.recent_activity?.length}
       <div class="card p-5">

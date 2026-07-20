@@ -175,6 +175,7 @@ class ApiClient {
   getRemnawaveNodes() { return this.get('/remnawave/nodes'); }
   getRemnawaveStats() { return this.get('/remnawave/stats'); }
   getRemnawaveSquads() { return this.get('/remnawave/squads'); }
+  getRemnawaveNodesStats() { return this.get('/remnawave/nodes-stats'); }
   remnawaveRevoke(username) { return this.post(`/remnawave/users/${username}/revoke`); }
   remnawaveEnable(username) { return this.post(`/remnawave/users/${username}/enable`); }
   remnawaveDisable(username) { return this.post(`/remnawave/users/${username}/disable`); }

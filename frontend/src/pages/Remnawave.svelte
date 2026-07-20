@@ -10,6 +10,7 @@
   let connected = $state(false);
   let stats = $state(null);
   let nodes = $state([]);
+  let nodesStats = $state(null);
   let remnawaveUsers = $state([]);
   let squads = $state([]);
   let loading = $state(true);
@@ -40,18 +41,20 @@
       const connectData = await api.getRemnawaveConnect();
       baseUrl = connectData.base_url || '';
 
-      const [s, n, u, sq] = await Promise.all([
+      const [s, n, u, sq, ns] = await Promise.all([
         api.getRemnawaveStats().catch(() => ({ connected: false })),
         api.getRemnawaveNodes().catch(() => ({ nodes: [] })),
         remnawaveProxy('GET', 'api/users?start=0&size=200')
           .then(d => d?.users || d?.response?.users || [])
           .catch(() => []),
         api.getRemnawaveSquads().catch(() => ({ squads: [] })),
+        api.getRemnawaveNodesStats().catch(() => ({ nodes: [], system: {}, recap: {} })),
       ]);
 
       connected = s.connected !== false;
       stats = s;
       nodes = n.nodes || [];
+      nodesStats = ns;
       remnawaveUsers = u;
       squads = sq.squads || [];
       connectionError = s.error || '';
@@ -293,31 +296,32 @@
 
     {:else if activeTab === 'load'}
       <div class="space-y-4">
-        {#if stats}
+        {#if nodesStats?.system}
+          {@const sys = nodesStats.system}
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div class="card p-5">
               <div class="flex items-center gap-2.5 mb-4">
                 <Icon name="cpu" class="w-4 h-4 text-accent" />
-                <h3 class="text-[14px] font-semibold">CPU</h3>
+                <h3 class="text-[14px] font-semibold">CPU Панели</h3>
               </div>
               <div class="flex items-end gap-3">
-                <p class="text-3xl font-bold">{stats.cpu_usage ?? 0}<span class="text-lg text-muted">%</span></p>
+                <p class="text-3xl font-bold">{sys.cpu_cores ?? 0}<span class="text-lg text-muted"> cores</span></p>
               </div>
-              <div class="mt-3 h-2 bg-surface-3 rounded-full overflow-hidden">
-                <div class="h-full rounded-full transition-all {loadColor(stats.cpu_usage || 0)}" style="width: {Math.min(stats.cpu_usage || 0, 100)}%"></div>
-              </div>
+              {#if sys.cpu_model}
+                <p class="text-[11px] text-muted mt-2">{sys.cpu_model}</p>
+              {/if}
             </div>
             <div class="card p-5">
               <div class="flex items-center gap-2.5 mb-4">
                 <Icon name="hard-drive" class="w-4 h-4 text-warning" />
-                <h3 class="text-[14px] font-semibold">Память</h3>
+                <h3 class="text-[14px] font-semibold">Память Панели</h3>
               </div>
               <div class="flex items-end gap-3">
-                <p class="text-3xl font-bold">{stats.mem_total ? Math.round((stats.mem_used / stats.mem_total) * 100) : 0}<span class="text-lg text-muted">%</span></p>
-                <p class="text-xs text-muted mb-1">{formatBytes(stats.mem_used)} / {formatBytes(stats.mem_total)}</p>
+                <p class="text-3xl font-bold">{sys.mem_total ? Math.round((sys.mem_used / sys.mem_total) * 100) : 0}<span class="text-lg text-muted">%</span></p>
+                <p class="text-xs text-muted mb-1">{formatBytes(sys.mem_used)} / {formatBytes(sys.mem_total)}</p>
               </div>
               <div class="mt-3 h-2 bg-surface-3 rounded-full overflow-hidden">
-                <div class="h-full rounded-full transition-all {loadColor(stats.mem_total ? (stats.mem_used / stats.mem_total) * 100 : 0)}" style="width: {stats.mem_total ? Math.min((stats.mem_used / stats.mem_total) * 100, 100) : 0}%"></div>
+                <div class="h-full rounded-full transition-all {loadColor(sys.mem_total ? (sys.mem_used / sys.mem_total) * 100 : 0)}" style="width: {sys.mem_total ? Math.min((sys.mem_used / sys.mem_total) * 100, 100) : 0}%"></div>
               </div>
             </div>
           </div>
@@ -329,8 +333,8 @@
                 <h3 class="text-[14px] font-semibold">Узлы</h3>
               </div>
               <div class="flex items-end gap-2">
-                <p class="text-3xl font-bold text-success">{stats.nodes_online ?? 0}</p>
-                <p class="text-sm text-muted mb-1">/ {stats.nodes_total ?? nodes.length} онлайн</p>
+                <p class="text-3xl font-bold text-success">{sys.nodes_online ?? 0}</p>
+                <p class="text-sm text-muted mb-1">/ {sys.nodes_total ?? nodes.length} онлайн</p>
               </div>
               <div class="mt-3 flex gap-1.5 flex-wrap">
                 {#each nodes as n}
@@ -343,42 +347,111 @@
                 <Icon name="clock" class="w-4 h-4 text-accent" />
                 <h3 class="text-[14px] font-semibold">Аптайм</h3>
               </div>
-              <p class="text-3xl font-bold">{formatUptime(stats.uptime)}</p>
-              {#if stats.uptime}
+              <p class="text-3xl font-bold">{formatUptime(sys.uptime)}</p>
+              {#if sys.uptime}
                 <p class="text-xs text-muted mt-2">Панель работает без перезагрузки</p>
               {/if}
             </div>
           </div>
+        {/if}
 
-          {#if nodes.length > 0}
+        {#if nodesStats?.recap}
+          {@const rp = nodesStats.recap}
+          {#if rp.version || rp.total_nodes}
             <div class="card p-5">
-              <h3 class="text-[14px] font-semibold mb-3">Нагрузка по узлам</h3>
-              <div class="space-y-3">
-                {#each nodes as node}
-                  <div class="flex items-center gap-3">
-                    <span class="text-[13px] font-medium min-w-[120px] truncate">{node.name || node.address}</span>
-                    <div class="flex-1 h-2 bg-surface-3 rounded-full overflow-hidden">
-                      <div class="h-full rounded-full {node.is_connected ? 'bg-success' : 'bg-danger'}" style="width: {node.is_connected ? '100' : '0'}%"></div>
-                    </div>
-                    <span class="text-xs text-muted min-w-[4ch] text-right">{node.users_count || 0}</span>
-                  </div>
-                {/each}
+              <div class="flex items-center gap-2.5 mb-3">
+                <Icon name="info" class="w-4 h-4 text-accent" />
+                <h3 class="text-[14px] font-semibold">Remnawave</h3>
               </div>
-              <p class="text-[11px] text-muted mt-3">Показано количество пользователей на узле</p>
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+                <div class="bg-surface-2/50 rounded-[8px] p-2.5">
+                  <p class="text-[11px] text-muted">Версия</p>
+                  <p class="text-lg font-bold mt-0.5">{rp.version || '—'}</p>
+                </div>
+                <div class="bg-surface-2/50 rounded-[8px] p-2.5">
+                  <p class="text-[11px] text-muted">Узлов (всего)</p>
+                  <p class="text-lg font-bold mt-0.5">{rp.total_nodes || 0}</p>
+                </div>
+                <div class="bg-surface-2/50 rounded-[8px] p-2.5">
+                  <p class="text-[11px] text-muted">CPU ядер узлов</p>
+                  <p class="text-lg font-bold mt-0.5">{rp.nodes_cpu_cores || 0}</p>
+                </div>
+                <div class="bg-surface-2/50 rounded-[8px] p-2.5">
+                  <p class="text-[11px] text-muted">RAM узлов</p>
+                  <p class="text-lg font-bold mt-0.5">{formatBytes(rp.nodes_ram)}</p>
+                </div>
+              </div>
             </div>
           {/if}
+        {/if}
+
+        {#if nodesStats?.nodes?.length > 0}
+          <div class="card p-5">
+            <h3 class="text-[14px] font-semibold mb-4">Нагрузка по узлам</h3>
+            <div class="space-y-4">
+              {#each nodesStats.nodes as node}
+                <div class="bg-surface-2/50 rounded-[10px] p-4">
+                  <div class="flex items-center justify-between gap-3 mb-3">
+                    <div class="flex items-center gap-2.5">
+                      <div class="w-8 h-8 rounded-[8px] {node.is_connected ? 'bg-success/10' : 'bg-danger/10'} flex items-center justify-center">
+                        <Icon name="server" class="w-4 h-4 {node.is_connected ? 'text-success' : 'text-danger'}" />
+                      </div>
+                      <div>
+                        <p class="text-[13px] font-semibold">{node.name || 'Узел'}</p>
+                        <p class="text-[10px] text-muted font-mono">{node.address || '—'}</p>
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <span class="badge {node.is_online ? 'badge-success' : 'badge-danger'} text-[10px]">{node.is_online ? 'Online' : 'Offline'}</span>
+                      {#if node.is_xray_running}
+                        <span class="badge badge-accent text-[10px]">Xray</span>
+                      {/if}
+                    </div>
+                  </div>
+                  <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">
+                    <div class="bg-surface-3/50 rounded-[6px] p-2">
+                      <p class="text-[10px] text-muted">CPU</p>
+                      <p class="text-sm font-bold mt-0.5">{node.cpu_count || 0} cores</p>
+                      {#if node.cpu_model}
+                        <p class="text-[9px] text-muted truncate" title={node.cpu_model}>{node.cpu_model}</p>
+                      {/if}
+                    </div>
+                    <div class="bg-surface-3/50 rounded-[6px] p-2">
+                      <p class="text-[10px] text-muted">RAM</p>
+                      <p class="text-sm font-bold mt-0.5">{node.total_ram || '—'}</p>
+                    </div>
+                    <div class="bg-surface-3/50 rounded-[6px] p-2">
+                      <p class="text-[10px] text-muted">Онлайн</p>
+                      <p class="text-sm font-bold mt-0.5">{node.users_online || 0}</p>
+                    </div>
+                    <div class="bg-surface-3/50 rounded-[6px] p-2">
+                      <p class="text-[10px] text-muted">Трафик</p>
+                      <p class="text-sm font-bold mt-0.5">{formatBytes(node.traffic_used)}</p>
+                      {#if node.traffic_limit}
+                        <p class="text-[9px] text-muted">/ {formatBytes(node.traffic_limit)}</p>
+                      {/if}
+                    </div>
+                    <div class="bg-surface-3/50 rounded-[6px] p-2">
+                      <p class="text-[10px] text-muted">Xray uptime</p>
+                      <p class="text-sm font-bold mt-0.5">{node.xray_uptime || '—'}</p>
+                    </div>
+                  </div>
+                </div>
+              {/each}
+            </div>
+          </div>
         {:else}
           <div class="card p-10 flex flex-col items-center gap-3 text-center">
             <Icon name="activity" class="w-10 h-10 text-muted" />
-            <p class="text-[15px] font-medium">Нет данных о нагрузке</p>
+            <p class="text-[15px] font-medium">Нет данных о нагрузке узлов</p>
             <button class="btn btn-secondary mt-2" onclick={loadAll}>Обновить</button>
           </div>
         {/if}
 
-        {#if stats?.raw}
+        {#if nodesStats?.system}
           <div class="card p-5">
-            <h3 class="text-[14px] font-semibold mb-3">Сырые данные</h3>
-            <pre class="text-[11px] text-muted font-mono overflow-x-auto whitespace-pre-wrap max-h-64 overflow-y-auto bg-surface-2/50 rounded-[8px] p-3">{JSON.stringify(stats.raw, null, 2)}</pre>
+            <h3 class="text-[14px] font-semibold mb-3">Системные данные</h3>
+            <pre class="text-[11px] text-muted font-mono overflow-x-auto whitespace-pre-wrap max-h-64 overflow-y-auto bg-surface-2/50 rounded-[8px] p-3">{JSON.stringify({ system: nodesStats.system, recap: nodesStats.recap }, null, 2)}</pre>
           </div>
         {/if}
       </div>

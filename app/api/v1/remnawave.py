@@ -86,6 +86,71 @@ async def remnawave_stats(_admin=Depends(get_current_admin)):
         return {"connected": False, "error": str(e)}
 
 
+@router.get("/nodes-stats")
+async def remnawave_nodes_stats(_admin=Depends(get_current_admin)):
+    """Return per-node stats with CPU/RAM data from Remnawave."""
+    svc = RemnawaveService()
+    try:
+        node_stats_raw = await svc.get_node_stats()
+        system_raw = await svc.get_system_stats_full()
+        recap_raw = await svc.get_system_recap()
+
+        nodes = node_stats_raw.get("nodes", [])
+        normalized_nodes = []
+        for n in nodes:
+            normalized_nodes.append({
+                "uuid": n.get("uuid", ""),
+                "name": n.get("name", ""),
+                "address": n.get("address", n.get("ip", "")),
+                "is_connected": n.get("isConnected", n.get("is_connected", False)),
+                "is_online": n.get("isNodeOnline", n.get("is_node_online", False)),
+                "is_xray_running": n.get("isXrayRunning", n.get("is_xray_running", False)),
+                "users_online": n.get("usersOnline", n.get("users_online", 0)),
+                "traffic_used": n.get("trafficUsedBytes", n.get("traffic_used_bytes", 0)),
+                "traffic_limit": n.get("trafficLimitBytes", n.get("traffic_limit_bytes", 0)),
+                "cpu_count": n.get("cpuCount", n.get("cpu_count", 0)),
+                "cpu_model": n.get("cpuModel", n.get("cpu_model", "")),
+                "total_ram": n.get("totalRam", n.get("total_ram", "")),
+                "xray_uptime": n.get("xrayUptime", n.get("xray_uptime", "")),
+                "country_code": n.get("countryCode", n.get("country_code", "")),
+                "last_status_change": n.get("lastStatusChange", n.get("last_status_change", "")),
+                "usage_coefficient": n.get("consumptionMultiplier", n.get("usage_coefficient", 1)),
+            })
+
+        cpu = system_raw.get("cpu", {})
+        memory = system_raw.get("memory", {})
+        users = system_raw.get("users", {})
+        online = system_raw.get("onlineStats", {})
+        nodes_summary = system_raw.get("nodes", {})
+
+        return {
+            "nodes": normalized_nodes,
+            "system": {
+                "cpu_cores": cpu.get("cores", cpu.get("count", 0)),
+                "cpu_model": cpu.get("model", ""),
+                "mem_used": memory.get("usedBytes", memory.get("used", 0)),
+                "mem_total": memory.get("totalBytes", memory.get("total", 0)),
+                "uptime": system_raw.get("uptimeSeconds", system_raw.get("uptime", 0)),
+                "users_total": users.get("totalUsers", 0),
+                "users_active": users.get("activeUsers", 0),
+                "online_now": online.get("onlineNow", 0),
+                "nodes_online": nodes_summary.get("totalOnline", 0),
+                "nodes_total": nodes_summary.get("total", nodes_summary.get("totalNodes", 0)),
+            },
+            "recap": {
+                "version": recap_raw.get("version", ""),
+                "total_nodes": recap_raw.get("total", {}).get("nodes", 0),
+                "total_traffic": recap_raw.get("total", {}).get("traffic", "0"),
+                "total_users": recap_raw.get("total", {}).get("users", 0),
+                "nodes_ram": recap_raw.get("total", {}).get("nodesRam", "0"),
+                "nodes_cpu_cores": recap_raw.get("total", {}).get("nodesCpuCores", 0),
+                "init_date": recap_raw.get("initDate", ""),
+            },
+        }
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Remnawave error: {str(e)}")
+
+
 @router.get("/squads")
 async def remnawave_squads(_admin=Depends(get_current_admin)):
     """Return list of Remnawave internal squads."""

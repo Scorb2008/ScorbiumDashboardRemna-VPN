@@ -336,7 +336,33 @@ class RemnawaveService(VpnPanelInterface):
         return {"nodes": []}
 
     async def get_node_stats(self) -> dict:
-        return {"nodes": []}
+        """Fetch per-node stats from /api/system/stats/nodes."""
+        try:
+            data = await self._client.get("/api/system/stats/nodes")
+            if isinstance(data, list):
+                return {"nodes": data}
+            if isinstance(data, dict):
+                return {"nodes": data.get("nodes", data.get("response", [])) or []}
+            return {"nodes": []}
+        except RemnawaveRequestError as e:
+            log.warning(f"[get_node_stats] failed: {e}")
+            return {"nodes": []}
+
+    async def get_system_stats_full(self) -> dict:
+        """Fetch system-level stats from /api/system/stats."""
+        try:
+            return await self._client.get("/api/system/stats") or {}
+        except RemnawaveRequestError as e:
+            log.warning(f"[get_system_stats_full] failed: {e}")
+            return {}
+
+    async def get_system_recap(self) -> dict:
+        """Fetch system recap from /api/system/stats/recap."""
+        try:
+            return await self._client.get("/api/system/stats/recap") or {}
+        except RemnawaveRequestError as e:
+            log.warning(f"[get_system_recap] failed: {e}")
+            return {}
 
     async def get_node_by_id(self, node_id: int) -> dict:
         raise RemnawaveRequestError(
