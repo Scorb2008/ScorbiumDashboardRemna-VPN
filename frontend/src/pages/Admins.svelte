@@ -2,7 +2,6 @@
   import { onMount } from 'svelte';
   import { api } from '../lib/api.svelte.js';
   import { toasts } from '../lib/stores.js';
-  import { formatDateTime } from '../lib/utils.js';
   import Table from '../components/Table.svelte';
   import Spinner from '../components/Spinner.svelte';
   import Modal from '../components/Modal.svelte';
@@ -22,6 +21,19 @@
 
   let confirmDelete = $state(false);
   let deleteTarget = $state(null);
+
+  let showSetup2FA = $state(false);
+  let setup2FALoading = $state(false);
+  let setup2FAResult = $state(null);
+  let verify2FACode = $state('');
+  let verify2FALoading = $state(false);
+
+  let showDisable2FA = $state(false);
+  let disable2FAPassword = $state('');
+  let disable2FALoading = $state(false);
+
+  let confirmDisable2FA = $state(false);
+  let disable2FATarget = $state(null);
 
   async function loadAdmins() {
     loading = true;
@@ -99,6 +111,54 @@
     confirmDelete = false; deleteTarget = null;
   }
 
+  async function openSetup2FA() {
+    setup2FALoading = true;
+    showSetup2FA = true;
+    setup2FAResult = null;
+    verify2FACode = '';
+    try {
+      setup2FAResult = await api.setup2fa();
+      await loadAdmins();
+    } catch (e) {
+      toasts.error(e.message);
+      showSetup2FA = false;
+    } finally {
+      setup2FALoading = false;
+    }
+  }
+
+  async function handleVerify2FA() {
+    if (!verify2FACode || verify2FACode.length < 6) return;
+    verify2FALoading = true;
+    try {
+      await api.verify2fa(verify2FACode);
+      toasts.success('2FA включена');
+      showSetup2FA = false;
+      setup2FAResult = null;
+      await loadAdmins();
+    } catch (e) { toasts.error(e.message); }
+    finally { verify2FALoading = false; }
+  }
+
+  function askDisable2FA(admin) {
+    disable2FATarget = admin;
+    disable2FAPassword = '';
+    confirmDisable2FA = true;
+  }
+
+  async function handleDisable2FA() {
+    if (!disable2FAPassword) return;
+    disable2FALoading = true;
+    try {
+      await api.disable2fa(disable2FAPassword);
+      toasts.success('2FA отключена');
+      confirmDisable2FA = false;
+      disable2FATarget = null;
+      await loadAdmins();
+    } catch (e) { toasts.error(e.message); }
+    finally { disable2FALoading = false; }
+  }
+
   function roleBadge(role) {
     switch (role) {
       case 'superadmin': return 'badge-accent';
@@ -118,11 +178,11 @@
   }
 
   const columns = [
-    { key: 'id', label: 'ID', sortable: true, render: (r) => `<span class="font-mono text-xs text-muted">${r.id}</span>` },
-    { key: 'username', label: 'Username', sortable: true, render: (r) => `<span class="font-medium text-[13px]">${r.username}${r.username === currentAdmin?.username ? ' <span class="text-muted text-xs">(вы)</span>' : ''}</span>` },
-    { key: 'role', label: 'Роль', sortable: true, render: (r) => `<span class="badge ${roleBadge(r.role)}">${roleText(r.role)}</span>` },
-    { key: 'is_active', label: 'Статус', sortable: true, render: (r) => `<span class="badge ${r.is_active !== false ? 'badge-success' : 'badge-danger'}">${r.is_active !== false ? 'Активен' : 'Блокирован'}</span>` },
-    { key: 'has_2fa', label: '2FA', sortable: true, render: (r) => r.has_2fa ? '<span class="badge badge-accent">✓</span>' : '<span class="text-muted text-xs">—</span>' },
+    { key: 'id', label: 'ID', sortable: true, render: (r) => `<span class="font-mono text-[11px] text-muted">${r.id}</span>` },
+    { key: 'username', label: 'Username', sortable: true, render: (r) => `<span class="font-medium text-[13px]">${r.username}${r.username === currentAdmin?.username ? ' <span class="text-muted text-[11px]">(вы)</span>' : ''}</span>` },
+    { key: 'role', label: 'Роль', sortable: true, render: (r) => `<span class="badge text-[10px] ${roleBadge(r.role)}">${roleText(r.role)}</span>` },
+    { key: 'is_active', label: 'Статус', sortable: true, render: (r) => `<span class="badge text-[10px] ${r.is_active !== false ? 'badge-success' : 'badge-danger'}">${r.is_active !== false ? 'Активен' : 'Блокирован'}</span>` },
+    { key: 'has_2fa', label: '2FA', sortable: true, render: (r) => r.has_2fa ? '<span class="badge badge-accent text-[10px]">✓</span>' : '<span class="text-muted text-[11px]">—</span>' },
   ];
 </script>
 
@@ -134,20 +194,33 @@
       <h1 class="text-[28px] font-bold tracking-tight text-text">Администраторы</h1>
       <p class="text-sm text-muted mt-1">{admins.length} администраторов</p>
     </div>
-    <button class="btn btn-primary" onclick={openCreate}>
-      <Icon name="plus" class="w-4 h-4" />
-      Новый администратор
-    </button>
+    <div class="flex gap-2">
+      {#if currentAdmin?.role === 'superadmin' && !currentAdmin?.has_2fa}
+        <button class="btn btn-secondary" onclick={openSetup2FA}>
+          <Icon name="shield" class="w-4 h-4" />
+          Включить 2FA
+        </button>
+      {/if}
+      <button class="btn btn-primary" onclick={openCreate}>
+        <Icon name="plus" class="w-4 h-4" />
+        Новый администратор
+      </button>
+    </div>
   </div>
 
   {#if admins.length > 0}
     <Table columns={columns} data={admins}>
       {#snippet actions(row)}
-        <button class="btn btn-ghost btn-sm text-muted hover:text-text" onclick={() => openEdit(row)} title="Редактировать">
-          <Icon name="pencil" class="w-3.5 h-3.5" />
+        <button class="btn btn-ghost btn-xs text-muted hover:text-text" onclick={() => openEdit(row)} title="Редактировать">
+          <Icon name="pencil" class="w-3 h-3" />
         </button>
-        <button class="btn btn-ghost btn-sm text-muted hover:text-danger" onclick={() => askDelete(row)} title="Удалить" disabled={row.username === currentAdmin?.username}>
-          <Icon name="trash-2" class="w-3.5 h-3.5" />
+        {#if row.has_2fa && row.username === currentAdmin?.username}
+          <button class="btn btn-ghost btn-xs text-warning hover:text-warning-hover" onclick={() => askDisable2FA(row)} title="Отключить 2FA">
+            <Icon name="shieldOff" class="w-3 h-3" />
+          </button>
+        {/if}
+        <button class="btn btn-ghost btn-xs text-muted hover:text-danger" onclick={() => askDelete(row)} title="Удалить" disabled={row.username === currentAdmin?.username}>
+          <Icon name="trash-2" class="w-3 h-3" />
         </button>
       {/snippet}
     </Table>
@@ -167,12 +240,14 @@
     </div>
     <div class="space-y-1">
       <label class="label">Пароль</label>
-      <input type="password" bind:value={createForm.password} class="input w-full" placeholder="Минимум 6 символов" required />
+      <input type="password" bind:value={createForm.password} class="input w-full" placeholder="Минимум 8 символов" required />
     </div>
     <div class="space-y-1">
       <label class="label">Роль</label>
       <select bind:value={createForm.role} class="select w-full">
-        <option value="superadmin">СуперАдмин</option>
+        {#if currentAdmin?.role === 'superadmin'}
+          <option value="superadmin">СуперАдмин</option>
+        {/if}
         <option value="manager">Менеджер</option>
         <option value="operator">Оператор</option>
       </select>
@@ -196,8 +271,10 @@
     </div>
     <div class="space-y-1">
       <label class="label">Роль</label>
-      <select bind:value={editForm.role} class="select w-full">
-        <option value="superadmin">СуперАдмин</option>
+      <select bind:value={editForm.role} class="select w-full" disabled={editTarget?.username === currentAdmin?.username}>
+        {#if currentAdmin?.role === 'superadmin'}
+          <option value="superadmin">СуперАдмин</option>
+        {/if}
         <option value="manager">Менеджер</option>
         <option value="operator">Оператор</option>
       </select>
@@ -213,9 +290,63 @@
   </form>
 </Modal>
 
+<Modal bind:open={showSetup2FA} title="Настройка 2FA" size="md">
+  {#if setup2FALoading}
+    <div class="flex items-center justify-center py-10">
+      <div class="w-6 h-6 border-2 border-accent/30 border-t-accent rounded-full animate-spin"></div>
+    </div>
+  {:else if setup2FAResult}
+    <div class="space-y-4">
+      <div class="flex flex-col items-center gap-3">
+        <img src={setup2FAResult.qr_code} alt="QR Code" class="w-48 h-48 rounded-lg" />
+        <div class="text-center">
+          <p class="text-[12px] text-muted mb-1">Или введите секрет вручную:</p>
+          <code class="text-[14px] font-mono text-accent bg-accent/5 px-3 py-1.5 rounded-lg select-all">{setup2FAResult.secret}</code>
+        </div>
+      </div>
+
+      <div class="bg-surface-2/50 rounded-lg p-3">
+        <p class="text-[12px] text-muted mb-2">Резервные коды (сохраните их):</p>
+        <div class="grid grid-cols-2 gap-1">
+          {#each setup2FAResult.backup_codes as code}
+            <code class="text-[12px] font-mono text-text bg-surface-3/50 px-2 py-1 rounded text-center select-all">{code}</code>
+          {/each}
+        </div>
+      </div>
+
+      <div class="space-y-1">
+        <label class="label">Введите код из аутентификатора для подтверждения</label>
+        <input type="text" inputmode="numeric" maxlength="6" bind:value={verify2FACode} class="input w-full text-center text-[20px] tracking-[0.5em] font-mono" placeholder="000000" />
+      </div>
+
+      <div class="flex gap-3 pt-1">
+        <button type="button" class="btn btn-secondary flex-1" onclick={() => { showSetup2FA = false; setup2FAResult = null; }}>Отмена</button>
+        <button class="btn btn-primary flex-1" onclick={handleVerify2FA} disabled={verify2FACode.length < 6 || verify2FALoading}>
+          {#if verify2FALoading}
+            <div class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+          {:else}
+            Подтвердить
+          {/if}
+        </button>
+      </div>
+    </div>
+  {/if}
+</Modal>
+
 <ConfirmDialog
   bind:show={confirmDelete}
   title="Удалить администратора?"
   message={`Удалить ${deleteTarget?.username}? Это действие необратимо.`}
   confirmText="Удалить" danger
   onConfirm={doDelete} />
+
+<ConfirmDialog
+  bind:show={confirmDisable2FA}
+  title="Отключить 2FA?"
+  message="Введите пароль для подтверждения отключения двухфакторной аутентификации."
+  confirmText="Отключить" danger
+  onConfirm={handleDisable2FA}
+  onCancel={() => { confirmDisable2FA = false; disable2FATarget = null; disable2FAPassword = ''; }}
+>
+  <input type="password" bind:value={disable2FAPassword} class="input w-full mt-3" placeholder="Пароль" />
+</ConfirmDialog>

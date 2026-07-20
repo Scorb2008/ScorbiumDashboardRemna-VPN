@@ -8,19 +8,52 @@
   let loading = $state(false);
   let error = $state('');
 
+  let twoFARequired = $state(false);
+  let tempToken = $state('');
+  let totpCode = $state('');
+  let twoFALoading = $state(false);
+
   async function handleLogin(e) {
     e.preventDefault();
     if (!username || !password) return;
     loading = true;
     error = '';
     try {
-      await api.login(username, password);
+      const result = await api.login(username, password);
+      if (result?.requires_2fa) {
+        tempToken = result.temp_token;
+        twoFARequired = true;
+        totpCode = '';
+        return;
+      }
       window.location.hash = '#/dashboard';
     } catch (err) {
       error = err.message || 'Ошибка авторизации';
     } finally {
       loading = false;
     }
+  }
+
+  async function handle2FA(e) {
+    e.preventDefault();
+    if (!totpCode || totpCode.length < 6) return;
+    twoFALoading = true;
+    error = '';
+    try {
+      await api.login2fa(tempToken, totpCode);
+      window.location.hash = '#/dashboard';
+    } catch (err) {
+      error = err.message || 'Неверный код';
+    } finally {
+      twoFALoading = false;
+    }
+  }
+
+  function backToLogin() {
+    twoFARequired = false;
+    tempToken = '';
+    totpCode = '';
+    error = '';
   }
 </script>
 
@@ -39,45 +72,87 @@
       </div>
     </div>
 
-    <form onsubmit={handleLogin} class="login-form">
-      <div class="login-field">
-        <label for="username" class="login-label">Логин</label>
-        <input
-          id="username"
-          type="text"
-          class="login-input"
-          placeholder="admin"
-          bind:value={username}
-          autocomplete="username"
-          autofocus />
-      </div>
-      <div class="login-field">
-        <label for="password" class="login-label">Пароль</label>
-        <input
-          id="password"
-          type="password"
-          class="login-input"
-          placeholder="••••••••"
-          bind:value={password}
-          autocomplete="current-password" />
-      </div>
-
-      {#if error}
-        <div class="login-error">
-          <Icon name="alertTriangle" size={14} class="shrink-0" />
-          <span>{error}</span>
+    {#if twoFARequired}
+      <form onsubmit={handle2FA} class="login-form">
+        <div class="two-fa-header">
+          <Icon name="shield" size={32} class="text-accent" />
+          <p class="text-[13px] text-muted mt-2">Введите код из приложения аутентификатора</p>
         </div>
-      {/if}
+        <div class="login-field">
+          <label for="totp" class="login-label">Код 2FA</label>
+          <input
+            id="totp"
+            type="text"
+            inputmode="numeric"
+            maxlength="6"
+            class="login-input text-center text-[24px] tracking-[0.5em] font-mono"
+            placeholder="000000"
+            bind:value={totpCode}
+            autofocus
+            required />
+        </div>
 
-      <button type="submit" class="login-submit" disabled={loading || !username || !password}>
-        {#if loading}
-          <div class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-          <span>Вход...</span>
-        {:else}
-          <span>Войти</span>
+        {#if error}
+          <div class="login-error">
+            <Icon name="alertTriangle" size={14} class="shrink-0" />
+            <span>{error}</span>
+          </div>
         {/if}
-      </button>
-    </form>
+
+        <button type="submit" class="login-submit" disabled={twoFALoading || totpCode.length < 6}>
+          {#if twoFALoading}
+            <div class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+            <span>Проверка...</span>
+          {:else}
+            <span>Подтвердить</span>
+          {/if}
+        </button>
+
+        <button type="button" class="login-back-btn" onclick={backToLogin}>
+          ← Назад к логину
+        </button>
+      </form>
+    {:else}
+      <form onsubmit={handleLogin} class="login-form">
+        <div class="login-field">
+          <label for="username" class="login-label">Логин</label>
+          <input
+            id="username"
+            type="text"
+            class="login-input"
+            placeholder="admin"
+            bind:value={username}
+            autocomplete="username"
+            autofocus />
+        </div>
+        <div class="login-field">
+          <label for="password" class="login-label">Пароль</label>
+          <input
+            id="password"
+            type="password"
+            class="login-input"
+            placeholder="••••••••"
+            bind:value={password}
+            autocomplete="current-password" />
+        </div>
+
+        {#if error}
+          <div class="login-error">
+            <Icon name="alertTriangle" size={14} class="shrink-0" />
+            <span>{error}</span>
+          </div>
+        {/if}
+
+        <button type="submit" class="login-submit" disabled={loading || !username || !password}>
+          {#if loading}
+            <div class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+            <span>Вход...</span>
+          {:else}
+            <span>Войти</span>
+          {/if}
+        </button>
+      </form>
+    {/if}
   </div>
 </div>
 
@@ -246,6 +321,27 @@
     opacity: 0.4;
     cursor: not-allowed;
     transform: none;
+  }
+
+  .login-back-btn {
+    background: none;
+    border: none;
+    color: #6b6b7d;
+    font-size: 13px;
+    cursor: pointer;
+    padding: 0.25rem;
+    transition: color 0.15s;
+    align-self: center;
+  }
+  .login-back-btn:hover {
+    color: #b0b0c0;
+  }
+
+  .two-fa-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0.5rem 0;
   }
 
   @keyframes cardIn {

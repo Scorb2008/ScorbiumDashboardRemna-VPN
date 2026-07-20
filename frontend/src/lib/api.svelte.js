@@ -65,6 +65,16 @@ class ApiClient {
     form.set('username', username);
     form.set('password', password);
     const data = await this.request('POST', '/auth/login', { body: form });
+    if (data.requires_2fa) {
+      return { requires_2fa: true, temp_token: data.temp_token };
+    }
+    this.#token = data.access_token;
+    localStorage.setItem('admin_token', data.access_token);
+    return data;
+  }
+
+  async login2fa(tempToken, code) {
+    const data = await this.request('POST', '/auth/2fa', { body: { temp_token: tempToken, code } });
     this.#token = data.access_token;
     localStorage.setItem('admin_token', data.access_token);
     return data;
@@ -189,6 +199,12 @@ class ApiClient {
   createAdmin(data) { return this.post('/admins/', data); }
   updateAdmin(id, data) { return this.patch(`/admins/${id}`, data); }
   deleteAdmin(id) { return this.del(`/admins/${id}`); }
+
+  // 2FA
+  setup2fa() { return this.post('/admins/2fa/setup'); }
+  verify2fa(code) { return this.post('/admins/2fa/verify', { code }); }
+  disable2fa(password) { return this.request('DELETE', '/admins/2fa', { body: { password } }); }
+  verifyBackupCode(code) { return this.post('/admins/2fa/backup-verify', { code }); }
 
   // Database
   getDatabaseStats() { return this.get('/database/stats'); }
