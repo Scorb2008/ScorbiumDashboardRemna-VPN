@@ -252,29 +252,31 @@
 
   <Table columns={columns} data={filteredSubscriptions}>
     {#snippet actions(row)}
-      <span class="badge {statusBadge(row.status)} text-[10px]">{statusText(row.status)}</span>
-      {#if row.status !== 'active'}
-        <button class="btn btn-ghost btn-xs text-success hover:text-success-hover" onclick={() => handleActivate(row.id)} title="Активировать">
-          <Icon name="play" class="w-3 h-3" />
+      <div class="flex items-center gap-0.5 whitespace-nowrap">
+        <span class="badge {statusBadge(row.status)} text-[10px]">{statusText(row.status)}</span>
+        {#if row.status !== 'active'}
+          <button class="btn btn-ghost btn-xs text-success hover:text-success-hover" onclick={() => handleActivate(row.id)} title="Активировать">
+            <Icon name="play" class="w-3 h-3" />
+          </button>
+        {/if}
+        {#if row.status === 'active' && row.remnawave_key_id}
+          <button class="btn btn-ghost btn-xs text-warning hover:text-warning-hover" onclick={() => askExtend(row)} title="Продлить">
+            <Icon name="clock" class="w-3 h-3" />
+          </button>
+          <button class="btn btn-ghost btn-xs text-accent hover:text-accent" onclick={() => askResetTraffic(row)} title="Сбросить трафик">
+            <Icon name="refreshCw" class="w-3 h-3" />
+          </button>
+          <button class="btn btn-ghost btn-xs text-warning hover:text-warning-hover" onclick={() => askDeactivate(row)} title="Отключить (локально)">
+            <Icon name="pause" class="w-3 h-3" />
+          </button>
+          <button class="btn btn-ghost btn-xs text-danger hover:text-danger-hover" onclick={() => askRevokePanel(row)} title="Отозвать в Remnawave">
+            <Icon name="shieldOff" class="w-3 h-3" />
+          </button>
+        {/if}
+        <button class="btn btn-ghost btn-xs text-danger hover:text-danger-hover" onclick={() => askDelete(row)} title="Удалить">
+          <Icon name="trash-2" class="w-3 h-3" />
         </button>
-      {/if}
-      {#if row.status === 'active' && row.remnawave_key_id}
-        <button class="btn btn-ghost btn-xs text-warning hover:text-warning-hover" onclick={() => askExtend(row)} title="Продлить">
-          <Icon name="clock" class="w-3 h-3" />
-        </button>
-        <button class="btn btn-ghost btn-xs text-accent hover:text-accent" onclick={() => askResetTraffic(row)} title="Сбросить трафик">
-          <Icon name="refreshCw" class="w-3 h-3" />
-        </button>
-        <button class="btn btn-ghost btn-xs text-warning hover:text-warning-hover" onclick={() => askDeactivate(row)} title="Отключить (локально)">
-          <Icon name="pause" class="w-3 h-3" />
-        </button>
-        <button class="btn btn-ghost btn-xs text-danger hover:text-danger-hover" onclick={() => askRevokePanel(row)} title="Отозвать в Remnawave">
-          <Icon name="shieldOff" class="w-3 h-3" />
-        </button>
-      {/if}
-      <button class="btn btn-ghost btn-xs text-danger hover:text-danger-hover" onclick={() => askDelete(row)} title="Удалить">
-        <Icon name="trash-2" class="w-3 h-3" />
-      </button>
+      </div>
     {/snippet}
   </Table>
   {#if total > limit}
