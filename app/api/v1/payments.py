@@ -256,12 +256,60 @@ async def list_payments(
     db: AsyncSession = Depends(get_db),
     _: str = Depends(get_current_admin),
 ):
+    from sqlalchemy import select
+    from app.models.user import User
+    from app.models.plan import Plan
+
     svc = PaymentService(db)
     parsed_from = datetime.fromisoformat(date_from) if date_from else None
     parsed_to = datetime.fromisoformat(date_to) if date_to else None
     items = await svc.get_all(limit=limit, offset=offset, status=status, user_id=user_id, date_from=parsed_from, date_to=parsed_to)
     total = await svc.count(status=status, user_id=user_id, date_from=parsed_from, date_to=parsed_to)
-    return {"items": items, "total": total, "limit": limit, "offset": offset}
+
+    user_ids = list({p.user_id for p in items})
+    users_map = {}
+    if user_ids:
+        res = await db.execute(select(User).where(User.id.in_(user_ids)))
+        users_map = {u.id: u for u in res.scalars().all()}
+
+    from app.models.vpn_key import VpnKey
+    vk_ids = list({p.vpn_key_id for p in items if p.vpn_key_id})
+    vk_plan_map = {}
+    if vk_ids:
+        res = await db.execute(select(VpnKey.id, VpnKey.plan_id, VpnKey.name).where(VpnKey.id.in_(vk_ids)))
+        vk_plan_map = {row.id: row for row in res.all()}
+
+    plan_ids = list({vk_plan_map[k.vpn_key_id].plan_id for k in items if k.vpn_key_id and k.vpn_key_id in vk_plan_map and vk_plan_map[k.vpn_key_id].plan_id})
+    plans_map = {}
+    if plan_ids:
+        res = await db.execute(select(Plan).where(Plan.id.in_(plan_ids)))
+        plans_map = {p.id: p for p in res.scalars().all()}
+
+    result = []
+    for p in items:
+        user = users_map.get(p.user_id)
+        plan_name = None
+        if p.vpn_key_id and p.vpn_key_id in vk_plan_map:
+            vk = vk_plan_map[p.vpn_key_id]
+            if vk.plan_id and vk.plan_id in plans_map:
+                plan_name = plans_map[vk.plan_id].name
+            elif vk.name:
+                plan_name = vk.name
+        result.append({
+            "id": p.id,
+            "user_id": p.user_id,
+            "user_full_name": user.full_name if user else None,
+            "user_username": user.username if user else None,
+            "amount": float(p.amount) if p.amount else 0,
+            "created_at": p.created_at.isoformat() if p.created_at else None,
+            "payment_method": p.provider,
+            "plan_name": plan_name,
+            "status": p.status,
+            "payment_type": p.payment_type,
+            "external_id": p.external_id,
+        })
+
+    return {"items": result, "total": total, "limit": limit, "offset": offset}
 
 
 @router.get("/{payment_id}", response_model=PaymentRead, summary="Get payment")
