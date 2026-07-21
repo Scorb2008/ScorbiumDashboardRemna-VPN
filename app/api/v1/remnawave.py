@@ -228,6 +228,18 @@ async def remnawave_extend_user(username: str, days: int = 30, _admin=Depends(ge
         raise HTTPException(status_code=502, detail=str(e))
 
 
+@router.post("/sync")
+async def remnawave_sync(_admin=Depends(get_current_admin)):
+    """Force manual sync of VPN keys from Remnawave panel."""
+    from app.tasks.vpn_tasks import sync_keys_from_remnawave
+
+    try:
+        await sync_keys_from_remnawave()
+        return {"ok": True, "message": "Sync completed"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Sync failed: {str(e)}")
+
+
 @router.api_route(
     "/proxy/{path:path}",
     methods=["GET", "POST", "PUT", "PATCH", "DELETE"],

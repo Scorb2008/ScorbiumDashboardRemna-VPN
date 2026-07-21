@@ -192,6 +192,7 @@ class ApiClient {
   remnawaveResetTraffic(username) { return this.post(`/remnawave/users/${username}/reset-traffic`); }
   remnawaveDelete(username) { return this.request('DELETE', `/remnawave/users/${username}`); }
   remnawaveExtend(username, days) { return this.post(`/remnawave/users/${username}/extend?days=${days}`); }
+  remnawaveSync() { return this.post('/remnawave/sync'); }
 
   // Admins
   getAdmins() { return this.get('/admins/'); }

@@ -494,7 +494,8 @@ class VpnKeyService:
         return len(keys)
 
     async def sync_from_remnawave(self) -> dict:
-        synced, errors, fixed_expire = 0, 0, 0
+        synced, errors, fixed_expire, revoked = 0, 0, 0, 0
+        revoked_keys: list[dict] = []
         traffic_columns_supported = await self._supports_traffic_columns()
         result = await self.session.execute(
             select(VpnKey)
@@ -505,6 +506,15 @@ class VpnKeyService:
             try:
                 panel_user = await self._get_panel().get_user(key.remnawave_key_id)
                 if not panel_user:
+                    if key.status != VpnKeyStatus.REVOKED.value:
+                        revoked += 1
+                        revoked_keys.append(
+                            {
+                                "key_id": key.id,
+                                "user_id": key.user_id,
+                                "name": key.name,
+                            }
+                        )
                     key.status = VpnKeyStatus.REVOKED.value
                 else:
                     if await self._sync_db_expire_from_panel(key, panel_user):
@@ -523,7 +533,13 @@ class VpnKeyService:
                 log.warning(f"Sync error key {key.id}: {e}")
                 errors += 1
         await self.session.flush()
-        return {"synced": synced, "errors": errors, "fixed_expire": fixed_expire}
+        return {
+            "synced": synced,
+            "errors": errors,
+            "fixed_expire": fixed_expire,
+            "revoked": revoked,
+            "revoked_keys": revoked_keys,
+        }
 
     async def expire_outdated(self) -> int:
         now = datetime.now(timezone.utc)

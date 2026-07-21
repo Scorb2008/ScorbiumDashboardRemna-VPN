@@ -26,7 +26,6 @@ class NotificationManager:
         log.info(f"[ws] Client disconnected. Total: {len(self._connections)}")
 
     async def broadcast(self, event: dict) -> None:
-        """Broadcast an event to all connected clients."""
         if not self._connections:
             return
         payload = {

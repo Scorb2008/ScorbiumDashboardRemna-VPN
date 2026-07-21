@@ -7,7 +7,7 @@ from app.utils.html_utils import escape_html
 from app.utils.log import log
 
 EXPIRE_CHECK_INTERVAL = 300
-SYNC_INTERVAL = 3600
+SYNC_INTERVAL = 300
 _AUTO_RENEW_LOW_BALANCE_NOTIFIED: dict[int, object] = {}
 
 
@@ -38,6 +38,25 @@ async def sync_keys_from_remnawave() -> None:
             result = await VpnKeyService(session).sync_from_remnawave()
             await session.commit()
             log.info(f"[vpn_tasks] VPN panel sync: {result}")
+
+            if result.get("revoked", 0) > 0:
+                from app.services.notification import notification_manager
+
+                revoked_keys = result.get("revoked_keys", [])
+                for rk in revoked_keys:
+                    log.warning(
+                        f"[sync] Key {rk['key_id']} user={rk['user_id']} "
+                        f"revoked — deleted from Remnawave panel"
+                    )
+                await notification_manager.broadcast(
+                    {
+                        "type": "sync_revoked",
+                        "data": {
+                            "count": result["revoked"],
+                            "keys": revoked_keys,
+                        },
+                    }
+                )
     except Exception:
         log.exception("[vpn_tasks] sync_keys_from_remnawave error")
 

@@ -19,6 +19,7 @@
     new_payment: { icon: 'wallet', color: 'text-accent', bg: 'bg-accent/10', label: 'Новый платёж' },
     expired_sub: { icon: 'alertTriangle', color: 'text-warning', bg: 'bg-warning/10', label: 'Истекла подписка' },
     new_ticket: { icon: 'headset', color: 'text-warning', bg: 'bg-warning/10', label: 'Новый тикет' },
+    sync_revoked: { icon: 'shieldOff', color: 'text-danger', bg: 'bg-danger/10', label: 'Удалено из Remnawave' },
   };
 
   function formatEventText(event) {
@@ -32,6 +33,8 @@
         return `${d.count || 0} подписок`;
       case 'new_ticket':
         return `${d.subject || 'Тикет'} — user #${d.user_id || '?'}`;
+      case 'sync_revoked':
+        return `${d.count || 0} ключей отозвано`; 
       default:
         return JSON.stringify(d);
     }

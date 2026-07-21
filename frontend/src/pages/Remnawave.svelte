@@ -17,6 +17,7 @@
   let activeTab = $state('nodes');
   let connectionError = $state('');
   let actionLoading = $state({});
+  let syncLoading = $state(false);
   let confirmAction = $state(null);
   let actionTarget = $state(null);
 
@@ -68,6 +69,19 @@
   }
 
   onMount(loadAll);
+
+  async function doSync() {
+    syncLoading = true;
+    try {
+      await api.remnawaveSync();
+      toasts.success('Синхронизация завершена');
+      await loadAll();
+    } catch (e) {
+      toasts.error('Ошибка синхронизации: ' + e.message);
+    } finally {
+      syncLoading = false;
+    }
+  }
 
   async function doUserAction(action, username) {
     actionLoading = { ...actionLoading, [`${action}:${username}`]: true };
@@ -174,10 +188,20 @@
       <h1 class="text-[28px] font-bold tracking-tight">VPN Инфраструктура</h1>
       <p class="text-sm text-muted mt-1">Remnawave — управление узлами и мониторинг</p>
     </div>
-    <button class="btn btn-secondary" onclick={loadAll} disabled={loading}>
-      <Icon name="refresh-cw" class="w-4 h-4" />
-      Обновить
-    </button>
+    <div class="flex gap-2">
+      <button class="btn btn-primary" onclick={doSync} disabled={syncLoading}>
+        {#if syncLoading}
+          <div class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+        {:else}
+          <Icon name="refresh-cw" class="w-4 h-4" />
+        {/if}
+        Синхронизация
+      </button>
+      <button class="btn btn-secondary" onclick={loadAll} disabled={loading}>
+        <Icon name="refresh-cw" class="w-4 h-4" />
+        Обновить
+      </button>
+    </div>
   </div>
 
   {#if baseUrl}
