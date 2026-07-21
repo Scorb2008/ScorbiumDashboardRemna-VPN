@@ -33,8 +33,12 @@
         return `${d.count || 0} подписок`;
       case 'new_ticket':
         return `${d.subject || 'Тикет'} — user #${d.user_id || '?'}`;
-      case 'sync_revoked':
-        return `${d.count || 0} ключей отозвано`; 
+      case 'sync_revoked': {
+        const keys = d.keys || [];
+        const names = keys.slice(0, 3).map(k => k.name || `#${k.key_id}`);
+        const more = keys.length > 3 ? ` и ещё ${keys.length - 3}` : '';
+        return `${d.count || 0} отозвано: ${names.join(', ')}${more}`;
+      }
       default:
         return JSON.stringify(d);
     }
@@ -203,7 +207,7 @@
                 <Icon name={meta.icon} class="w-3.5 h-3.5 {meta.color}" />
               </div>
               <div class="flex-1 min-w-0">
-                <p class="text-[13px] truncate">{meta.label}: {formatEventText(event)}</p>
+                <p class="text-[13px] truncate" title={formatEventText(event)}>{meta.label}: {formatEventText(event)}</p>
               </div>
               <span class="text-[10px] text-muted shrink-0">{eventTime(event.ts)}</span>
             </div>
